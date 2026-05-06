@@ -1735,10 +1735,11 @@ function go(scr){
 
 // === BOOST ===
 function boost(type,amt){
-  if(type==='not')addNot(amt);
-  if(type==='btc')addBTC(amt,'Demo Boost');
-  if(type==='energy')G.nrg=Math.min(10,G.nrg+amt);
-  ui();rHome();
+  if(type==='not'){G.not=(G.not||0)+amt;try{checkCloudMilestones();}catch(e){}}
+  if(type==='btc'){G.btc=parseFloat(((G.btc||0)+amt).toFixed(8));}
+  if(type==='energy'){G.nrg=Math.min(10,(G.nrg||0)+amt);}
+  if(type==='fans'){G.fans=(G.fans||0)+amt;}
+  saveGame();ui();try{rHome();}catch(e){}
 }
 
 // === GIG ===
@@ -4940,8 +4941,12 @@ function claimDailyBonus(){
 // Track daily progress automatically
 const _origAddNot=addNot, _origAddFans=addFans;
 function addNot(a){
-  _origAddNot(a);
-  // don't double-track here
+  G.not=(G.not||0)+a;
+  if(G.daily&&G.daily.progress){
+    G.daily.progress['dm_not']=(G.daily.progress['dm_not']||0)+a;
+  }
+  try{checkCloudMilestones();}catch(e){}
+  saveGame();
 }
 function addFans(a){
   _origAddFans(a);

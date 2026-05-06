@@ -427,6 +427,8 @@ nav::-webkit-scrollbar-thumb{background:var(--p);border-radius:2px}
 <!-- HOME -->
 <div id="screen-home" class="screen active">
   <div id="home-msg"></div>
+  <!-- Hidden legacy elements rHome() needs -->
+  <span id="h-tier" style="display:none">LV 1</span>
 
   <!-- IDENTITY BAR -->
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;background:linear-gradient(135deg,rgba(108,63,255,.08),rgba(0,240,255,.04));border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
@@ -1317,7 +1319,9 @@ nav::-webkit-scrollbar-thumb{background:var(--p);border-radius:2px}
 <script>
 // === PARTICLE SYSTEM ===
 (function(){
+  try{
   const c=document.getElementById('cvs');
+  if(!c||!c.getContext){return;}
   const ctx=c.getContext('2d');
   let W,H,pts=[];
   function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
@@ -1355,6 +1359,7 @@ nav::-webkit-scrollbar-thumb{background:var(--p);border-radius:2px}
   }
   window.addEventListener('resize',()=>{resize();init()});
   resize();init();draw();
+  }catch(e){}
 })();
 
 // === GAME DATA ===
@@ -1505,14 +1510,8 @@ function addBTC(a,lbl){
   G.txs.unshift({l:lbl,a:a.toFixed(5),t:new Date().toLocaleTimeString()});
   if(G.txs.length>30)G.txs.pop();
 }
-function addNot(a){
-  const prev=curTier();
-  G.not+=a;
-  const now=curTier();
-  if(now.l>prev.l)toast('🏆 TIER UP! Now '+now.n+' (LV '+now.l+')',false,true);
-  updateLegacy();
-}
-function addFans(a){G.fans+=a;}
+/* dup addNot removed */ 
+/* dup addFans removed */ 
 function updateLegacy(){
   const c=curCloud();
   if(c)document.getElementById('leg-lives').textContent=Math.floor(G.fans/500).toLocaleString();
@@ -1530,11 +1529,25 @@ function toast(msg,err=false,big=false){
 
 // === SPLASH ===
 function launch(){
-  document.getElementById('splash').classList.add('out');
-  document.getElementById('app').style.display='flex';
-  rHome();
-  setTimeout(()=>{const s=document.getElementById('splash');if(s)s.remove();},1000);
-  setTimeout(()=>{try{AUD.init();AUD._inited=true;AUD.riser(null,1.5);setTimeout(()=>AUD.startBeat('house'),1600);}catch(e){}},400);
+  try{
+    var splash=document.getElementById('splash');
+    var app=document.getElementById('app');
+    if(splash)splash.classList.add('out');
+    if(app){app.style.display='flex';app.style.flexDirection='column';}
+    try{rHome();}catch(e){console.warn('rHome error:',e);}
+    setTimeout(function(){
+      var s=document.getElementById('splash');
+      if(s){s.style.display='none';try{s.remove();}catch(e){}}
+    },1000);
+    setTimeout(function(){
+      try{AUD.init();AUD._inited=true;AUD.riser(null,1.5);
+        setTimeout(function(){AUD.startBeat('house');},1600);}catch(e){}
+    },400);
+  }catch(e){
+    console.error('launch error:',e);
+    var app=document.getElementById('app');
+    if(app)app.style.display='flex';
+  }
 }
 
 // === UI UPDATE ===
@@ -1612,12 +1625,7 @@ function rProfile(){
   document.getElementById('p-stats').innerHTML=Object.entries(G.stats).map(([k,v])=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--text2);font-weight:600">${k.charAt(0).toUpperCase()+k.slice(1)}</span><span class="pu" style="font-family:'Orbitron',monospace">${v}%</span></div><div class="pb"><div class="pf" style="width:${v}%"></div></div></div>`).join('');
 }
 
-function rClubs(){
-  document.getElementById('clubs-list').innerHTML=VENUES.map((v,i)=>{
-    const locked=curTier().l<v.t;
-    return `<div class="vr"><span style="font-size:26px">${v.i}</span><div style="flex:1"><div style="font-weight:700;font-size:13px">${v.n}</div><div style="font-size:11px;color:var(--text2)">${v.v}</div><div style="font-size:10px;color:var(--text3);font-family:'Orbitron',monospace;margin-top:2px">₿${v.b.toFixed(4)} · ${v.nt} NOT. · ${v.f} fans · Min Tier ${v.t}</div></div><button class="btn ${locked?'':'bp'}" onclick="playGig(${i})" ${locked||G.nrg<2?'disabled':''}>${locked?'LOCKED':'PLAY GIG'}</button></div>`;
-  }).join('');
-}
+/* dup rClubs removed */ 
 
 function rEvents(){
   document.getElementById('ev-list').innerHTML=EVTS.map((ev,i)=>{
@@ -1654,19 +1662,7 @@ function rMixLib(){
   document.getElementById('mx-lib').innerHTML=TRACKS.map(t=>`<button class="btn" style="font-size:10px;font-family:'Orbitron',monospace" onclick="loadTrk('${t}')">+ ${t}</button>`).join('');
 }
 
-function rMultiverse(){
-  const cl=curCloud();
-  const clNum=cl?cl.c:0;
-  document.getElementById('mv-grid').innerHTML=MVWORLDS.map(w=>{
-    const unlocked=G.not>=0&&w.c===0||clNum>=w.c;
-    return `<div class="mv-node ${unlocked?'unlocked':'locked'}" onclick="${unlocked?'toast(\''+w.n+' — ACCESSIBLE\')':'toast(\'Reach Cloud '+w.c+' to unlock\',true)'}">
-      <div style="font-size:32px;margin-bottom:6px">${w.ic}</div>
-      <div style="font-family:'Orbitron',monospace;font-size:10px;font-weight:700;color:${unlocked?'var(--p3)':'var(--text3)'};margin-bottom:4px">${w.n}</div>
-      <div style="font-size:10px;color:var(--text2)">${w.d}</div>
-      ${!unlocked?`<div style="font-size:9px;color:var(--text3);margin-top:5px;font-family:'Orbitron',monospace">Cloud ${w.c} Required</div>`:''}
-    </div>`;
-  }).join('');
-}
+// [duplicate rMultiverse removed]
 
 // === NAVIGATION ===
 function go(scr){
@@ -2080,7 +2076,7 @@ const VENUE_THEMES=[
   {bg:'#080010',c1:'#ff6b35',label:'Universal Apex'}
 ];
 let vCvs=null,vCtx=null,vAnim=null,vCur=-1;
-function initVenue(){vCvs=document.getElementById('venue-cvs');if(!vCvs)return;vCvs.width=window.innerWidth;vCvs.height=window.innerHeight;vCtx=vCvs.getContext('2d');}
+function initVenue(){vCvs=document.getElementById('venue-cvs');if(!vCvs||!vCvs.getContext)return;vCvs.width=window.innerWidth;vCvs.height=window.innerHeight;vCtx=vCvs.getContext('2d');}
 function setVenue(i){
   if(!vCtx)initVenue();if(!vCtx)return;
   vCur=i;cancelAnimationFrame(vAnim);
@@ -2174,18 +2170,7 @@ if(!G.lastLogin)G.lastLogin=null;
 if(!G.dailyClaimed)G.dailyClaimed=false;
 
 
-function claimDaily(){
-  const today=new Date().toDateString();
-  if(G.dailyClaimed){document.getElementById('daily-msg').textContent='Already claimed today. Come back tomorrow!';return;}
-  const idx=Math.min(G.dailyStreak,6);
-  DAILY_REWARDS[idx].fn();
-  G.dailyStreak=Math.min(7,(G.dailyStreak||0)+1);
-  if(G.dailyStreak>=7)G.dailyStreak=0;
-  G.dailyClaimed=true;G.lastLogin=today;
-  saveGame();ui();rDaily();
-  document.getElementById('daily-msg').textContent='🎉 Bonus claimed!';
-  toast('🎁 Daily bonus claimed!');
-}
+/* dup claimDaily removed */ 
 
 // 3. SETTINGS SYSTEM
 const SETTINGS={music:true,sfx:true,crowd:true,particles:true,venues:true,scan:true,save:true,daily:true};
@@ -3224,55 +3209,18 @@ setInterval(_clnCheckRebellions,30000);
 setInterval(_clnRevenueTick,60000);
 
 // ── VIP LOUNGE ──
-function rVIP(){
-  if(!G.vip) G.vip={tier:0,spent:0};
-  const cur=VIP_TIERS[G.vip.tier]||VIP_TIERS[0],next=VIP_TIERS[G.vip.tier+1];
-  document.getElementById('vip-tier-banner').innerHTML=`<div style="display:flex;align-items:center;gap:12px"><span style="font-size:32px">${cur.ic}</span><div style="flex:1"><div style="font-family:'Orbitron',monospace;font-weight:900;font-size:14px;color:${cur.color}">${cur.n}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">${cur.perk}</div></div>${next?`<div style="text-align:right"><div style="font-size:9px;color:var(--text3);font-family:'Orbitron',monospace">NEXT: ${next.n}</div><div style="font-size:10px;color:var(--gold);font-family:'Orbitron',monospace">₿${next.cost.toFixed(4)}</div></div>`:'<div style="font-size:10px;color:var(--gold);font-family:Orbitron,monospace">MAX TIER</div>'}</div>`;
-  document.getElementById('vip-tier-list').innerHTML=VIP_TIERS.map(vt=>{
-    const owned=G.vip.tier>=vt.id,isCur=G.vip.tier===vt.id;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:20px;opacity:${owned?1:.4}">${vt.ic}</span><div style="flex:1"><div style="font-weight:700;font-size:12px;color:${owned?vt.color:'var(--text2)'}">${isCur?'► ':''} ${vt.n}</div><div style="font-size:10px;color:var(--text3)">${vt.perk}</div></div>${!owned&&vt.cost>0?`<button class="btn ${G.btc>=vt.cost?'bp':''}" onclick="upgradeVIP(${vt.id})" ${G.btc<vt.cost?'disabled':''} style="font-family:'Orbitron',monospace;font-size:9px;padding:6px 10px">₿${vt.cost.toFixed(3)}</button>`:`<span style="font-size:10px;color:${owned?'var(--green)':'var(--text3)'}">${owned?'✓ OWNED':''}</span>`}</div>`;
-  }).join('');
-  const perks=VIP_TIERS.slice(0,G.vip.tier+1).map(vt=>vt.perk);
-  document.getElementById('vip-perks').innerHTML=perks.length?perks.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11px"><span style="color:var(--green)">✓</span>${p}</div>`).join(''):'Upgrade to unlock perks.';
-}
-function upgradeVIP(tier){
-  if(!G.vip) G.vip={tier:0,spent:0};
-  const vt=VIP_TIERS[tier]; if(!vt||G.btc<vt.cost||G.vip.tier>=tier) return;
-  G.btc=parseFloat((G.btc-vt.cost).toFixed(8));
-  G.vip.tier=tier;G.vip.spent=(G.vip.spent||0)+vt.cost;
-  toast('💎 Welcome to '+vt.n+'! '+vt.perk);
-  pushNotification('💎 Upgraded to '+vt.n,'reward',vt.ic);
-  ui();rVIP();saveGame();
-}
+// [duplicate rVIP removed]
+/* dup upgradeVIP removed */ 
 
 // ── AWARDS ──
-function rAwards(){
-  if(!G.awards) G.awards={won:[],nominated:[]};
-  checkAwardEligibility();renderNominees();renderWonAwards();renderEligibility();
-}
-function checkAwardEligibility(){
-  if(!G.awards) G.awards={won:[],nominated:[]};
-  AWARD_CATEGORIES.forEach(aw=>{
-    if(aw.check()&&!(G.awards.won||[]).includes(aw.id)&&!(G.awards.nominated||[]).includes(aw.id)){
-      G.awards.nominated=(G.awards.nominated||[]);G.awards.nominated.push(aw.id);
-      pushNotification('🏅 Nominated: '+aw.n,'event','🏅');
-    }
-  });
-}
+// [duplicate rAwards removed]
+/* dup checkAwardEligibility removed */ 
 function renderNominees(){
   const nom=(G.awards.nominated||[]).filter(id=>!(G.awards.won||[]).includes(id));
   const el=document.getElementById('awd-nominees'); if(!el) return;
   el.innerHTML=nom.length?nom.map(id=>{const aw=AWARD_CATEGORIES.find(x=>x.id===id);if(!aw)return '';return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:28px">${aw.ic}</span><div style="flex:1"><div style="font-weight:700;font-size:12px;color:var(--gold)">${aw.n}</div></div><button class="btn bp" onclick="claimAward('${aw.id}')" style="font-family:'Orbitron',monospace;font-size:10px;padding:8px 12px">CLAIM 🏆</button></div>`;}).join(''):'<div style="font-size:11px;color:var(--text2);padding:8px 0">No nominations yet. Keep building your career.</div>';
 }
-function claimAward(id){
-  if(!G.awards) G.awards={won:[],nominated:[]};
-  const aw=AWARD_CATEGORIES.find(x=>x.id===id); if(!aw||(G.awards.won||[]).includes(id)) return;
-  G.awards.won=(G.awards.won||[]);G.awards.won.push(id);
-  addBTC(.05,'Award: '+aw.n);addNot(10000);addFans(50000);
-  toast('🏆 WON: '+aw.n+'! +₿0.05 · +10K NOT · +50K fans');
-  pushNotification('🏆 AWARD WON: '+aw.n,'event','🏆');
-  ui();rAwards();saveGame();
-}
+/* dup claimAward removed */ 
 function renderWonAwards(){
   const el=document.getElementById('awd-won'); if(!el) return;
   if(!(G.awards.won||[]).length){el.textContent='No awards yet.';return;}
@@ -3284,176 +3232,35 @@ function renderEligibility(){
 }
 
 // ── LEGACY 2.0 ──
-function rLegacy2(){
-  if(!G.legacy2) G.legacy2={missions:[],impact:0,rescued:0};
-  document.getElementById('lg2-impact').textContent=(G.legacy2.impact||0).toLocaleString();
-  document.getElementById('lg2-lives').textContent=(G.legacy2.rescued||0).toLocaleString();
-  renderLegacy2Missions();renderDonateOptions();renderImpactReport();
-}
-function getLegacy2Progress(m){
-  if(m.stat==='fans') return G.fans;
-  if(m.stat==='btcTotal') return G.inc?(G.inc.gig+G.inc.bat):0;
-  if(m.stat==='recruits') return G.recruits?G.recruits.length:0;
-  if(m.stat==='schoolLessons') return G.school?(G.school.lessonsComplete||[]).length:0;
-  return 0;
-}
-function renderLegacy2Missions(){
-  const el=document.getElementById('lg2-missions'); if(!el) return;
-  el.innerHTML=LEGACY2_MISSIONS.map(m=>{
-    const prog=Math.min(getLegacy2Progress(m),m.goal),pct=Math.round(prog/m.goal*100);
-    const done=(G.legacy2.missions||[]).includes(m.id);
-    return `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);opacity:${done?.7:1}"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">${m.ic}</span><div style="flex:1"><div style="font-weight:700;font-size:12px;color:${done?'var(--green)':'var(--text)'}">${m.n}</div><div style="font-size:10px;color:var(--text2);margin-bottom:5px">${m.desc}</div><div style="height:4px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;border-radius:2px;width:${pct}%;background:linear-gradient(90deg,#00ff88,#00f0ff)"></div></div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:'Orbitron',monospace">${prog.toLocaleString()} / ${m.goal.toLocaleString()}</div></div>${done?'<span style="font-size:18px">✅</span>':pct>=100?`<button class="btn bp" onclick="claimLegacy2('${m.id}')" style="font-family:'Orbitron',monospace;font-size:9px;padding:7px 10px">COMPLETE</button>`:''}</div></div>`;
-  }).join('');
-}
-function claimLegacy2(id){
-  if(!G.legacy2) G.legacy2={missions:[],impact:0,rescued:0};
-  const m=LEGACY2_MISSIONS.find(x=>x.id===id); if(!m||(G.legacy2.missions||[]).includes(id)) return;
-  G.legacy2.missions=(G.legacy2.missions||[]);G.legacy2.missions.push(id);
-  G.legacy2.impact=(G.legacy2.impact||0)+m.reward.impact;
-  G.legacy2.rescued=(G.legacy2.rescued||0)+m.reward.lives;
-  addBTC(m.reward.btcBack,'Legacy: '+m.n);
-  toast('✦ Legacy Mission: '+m.n+' · '+m.reward.lives.toLocaleString()+' lives reached');
-  pushNotification('✦ Legacy Mission complete: '+m.n,'event','✦');
-  ui();rLegacy2();saveGame();
-}
-function renderDonateOptions(){
-  const el=document.getElementById('lg2-donate-options'); if(!el) return;
-  el.innerHTML=DONATE_OPTIONS.map(d=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:20px">${d.ic}</span><div style="flex:1"><div style="font-weight:700;font-size:11px">${d.n}</div><div style="font-size:10px;color:var(--text2)">${d.desc}</div><div style="font-size:9px;color:var(--green)">+${d.lives} lives</div></div><button class="btn bp" onclick="donate(${d.amount},${d.lives},'${d.n}')" ${G.btc<d.amount?'disabled':''} style="font-family:'Orbitron',monospace;font-size:9px;padding:6px 10px">₿${d.amount.toFixed(4)}</button></div>`).join('');
-}
-function donate(amount,lives,name){
-  if(!G.legacy2) G.legacy2={missions:[],impact:0,rescued:0};
-  if(G.btc<amount){toast('Need ₿'+amount,true);return;}
-  G.btc=parseFloat((G.btc-amount).toFixed(8));
-  G.legacy2.impact=(G.legacy2.impact||0)+Math.floor(amount*1000);
-  G.legacy2.rescued=(G.legacy2.rescued||0)+lives;
-  toast('✦ Donated ₿'+amount.toFixed(4)+' to '+name+' · +'+lives+' lives');
-  ui();rLegacy2();saveGame();
-}
-function renderImpactReport(){
-  const el=document.getElementById('lg2-report'); if(!el) return;
-  if(!G.legacy2||(!G.legacy2.impact&&!G.legacy2.rescued)){el.textContent='Complete missions to generate your report.';return;}
-  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="padding:8px;border-radius:8px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);text-align:center"><div style="font-size:9px;color:var(--text3);font-family:'Orbitron',monospace">IMPACT</div><div style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:var(--green)">${(G.legacy2.impact||0).toLocaleString()}</div></div><div style="padding:8px;border-radius:8px;background:rgba(0,240,255,.1);border:1px solid rgba(0,240,255,.2);text-align:center"><div style="font-size:9px;color:var(--text3);font-family:'Orbitron',monospace">LIVES</div><div style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:var(--cyan)">${(G.legacy2.rescued||0).toLocaleString()}</div></div></div><div style="margin-top:10px;font-size:11px;color:var(--text2)">Missions: <b style="color:var(--gold)">${(G.legacy2.missions||[]).length} / ${LEGACY2_MISSIONS.length}</b><br>Your music. Your platform. Your legacy.</div>`;
-}
+/* dup rLegacy2 removed */ 
+/* dup getLegacy2Progress removed */ 
+/* dup renderLegacy2Missions removed */ 
+/* dup claimLegacy2 removed */ 
+/* dup renderDonateOptions removed */ 
+/* dup donate removed */ 
+/* dup renderImpactReport removed */ 
 
 // ── SOUNDBOARD ──
-function rSoundboard(){
-  if(!G.soundboard) G.soundboard={sessions:0,best:0};
-  document.getElementById('sb-sess').textContent=G.soundboard.sessions;
-  document.getElementById('sb-best').textContent=G.soundboard.best;
-  renderSBPads();
-}
+/* dup rSoundboard removed */ 
 function renderSBPads(){
   const el=document.getElementById('sb-pad-grid'); if(!el) return;
   el.innerHTML=SB_PADS.map((p,i)=>`<button onclick="hitPad(${i})" id="sbpad-${i}" style="height:64px;border-radius:12px;border:2px solid ${p.color}44;background:${p.color}18;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all .08s;font-family:inherit"><span style="font-size:20px">${p.ic}</span><span style="font-size:8px;color:${p.color};font-family:'Orbitron',monospace;letter-spacing:.06em">${p.n}</span></button>`).join('');
 }
-function startSoundboard(){
-  sbActive=true;sbCombo=0;sbScore=0;
-  document.getElementById('sb-start-btn').disabled=true;
-  document.getElementById('sb-combo').textContent='x1';
-  document.getElementById('sb-score').textContent='0';
-  toast('🎹 Session started! Tap pads to build combos.');
-}
-function hitPad(i){
-  if(!sbActive){startSoundboard();}
-  const p=SB_PADS[i];sbCombo++;sbScore+=p.not*sbCombo;
-  document.getElementById('sb-combo').textContent='x'+sbCombo;
-  document.getElementById('sb-score').textContent=sbScore.toLocaleString();
-  const pad=document.getElementById('sbpad-'+i);
-  if(pad){pad.style.background=p.color+'88';setTimeout(()=>{pad.style.background=p.color+'18';},120);}
-}
-function endSoundboard(){
-  if(!sbActive&&sbScore===0) return;
-  sbActive=false;
-  if(!G.soundboard) G.soundboard={sessions:0,best:0};
-  G.soundboard.sessions++;
-  if(sbScore>G.soundboard.best) G.soundboard.best=sbScore;
-  addNot(Math.floor(sbScore*.5));addBTC(sbScore*.0000001,'Soundboard');
-  toast('🎹 Session done! Score: '+sbScore.toLocaleString());
-  document.getElementById('sb-start-btn').disabled=false;
-  document.getElementById('sb-sess').textContent=G.soundboard.sessions;
-  document.getElementById('sb-best').textContent=G.soundboard.best;
-  sbScore=0;sbCombo=0;ui();saveGame();
-}
+/* dup startSoundboard removed */ 
+/* dup hitPad removed */ 
+/* dup endSoundboard removed */ 
 
 // ── RECORDING STUDIO ──
-function rStudio(){
-  if(!G.studio) G.studio={tracks:[],released:0,revenue:0};
-  document.getElementById('st2-tracks').textContent=(G.studio.tracks||[]).length;
-  document.getElementById('st2-rel').textContent=G.studio.released||0;
-  document.getElementById('st2-rev').textContent='₿'+(G.studio.revenue||0).toFixed(5);
-  initStudioCanvas();renderDiscography();
-}
-function initStudioCanvas(){
-  studioCanvas=document.getElementById('st2-canvas'); if(!studioCanvas) return;
-  studioCtx=studioCanvas.getContext('2d');
-  cancelAnimationFrame(studioAnim);studioFrame=0;drawStudioLoop();
-}
-function drawStudioLoop(){
-  studioAnim=requestAnimationFrame(drawStudioLoop);studioFrame++;
-  if(!studioCtx||!studioCanvas) return;
-  const W=studioCanvas.offsetWidth||300,H=100;
-  if(studioCanvas.width!==W){studioCanvas.width=W;studioCanvas.height=H;}
-  const ctx=studioCtx;
-  ctx.fillStyle='rgba(1,1,8,.25)';ctx.fillRect(0,0,W,H);
-  const colors={House:'#00f0ff',Techno:'#ff30aa',Trap:'#f5c542','D&B':'#ff4400',Ambient:'#00ff88'};
-  const col=colors[studioGenre]||'#6c3fff';
-  for(let t=0;t<4;t++){
-    const yBase=H*.15+t*H*.18;
-    ctx.save();ctx.strokeStyle=col+(t===0?'ff':'66');ctx.lineWidth=t===0?1.5:.8;
-    ctx.beginPath();ctx.moveTo(0,yBase);
-    for(let x=0;x<W;x+=2){ctx.lineTo(x,yBase+Math.sin(x*.04+studioFrame*.04+t*1.2)*8*(1-t*.15)*(Math.sin(studioFrame*.02+x*.05+t)*.5+.5));}
-    ctx.stroke();ctx.restore();
-  }
-  for(let m=0;m<8;m++){const mh=Math.abs(Math.sin(studioFrame*.08+m*.8))*(H*.6);const mx=W-60+m*7;ctx.fillStyle=mh>H*.4?'#ff2255':mh>H*.25?'#f5c542':col;ctx.fillRect(mx,H-mh-5,5,mh);}
-}
-function setStudioGenre(btn,genre){
-  studioGenre=genre;
-  document.querySelectorAll('#st2-genre-btns .btn').forEach(b=>b.className='btn');
-  btn.className='btn bp';
-}
-function setStudioQual(btn,qual,cost,label){
-  studioQual=qual;studioQualCost=cost;studioQualLabel=label;
-  document.querySelectorAll('#st2-qual-btns .btn').forEach(b=>b.className='btn');
-  btn.className='btn bp';
-}
-function recordTrack(){
-  if(!G.studio) G.studio={tracks:[],released:0,revenue:0};
-  if(G.btc<studioQualCost){toast('Need ₿'+studioQualCost.toFixed(4),true);return;}
-  G.btc=parseFloat((G.btc-studioQualCost).toFixed(8));
-  const streams=Math.floor((G.fans*.3+G.not*.01)*(1+Math.random())*(studioQual==='album'?3:studioQual==='ep'?1.5:1));
-  const revenue=streams*.0000001;
-  const track={name:TRACK_NAMES[Math.floor(Math.random()*TRACK_NAMES.length)],genre:studioGenre,qual:studioQualLabel,streams,revenue,released:Date.now()};
-  G.studio.tracks=(G.studio.tracks||[]);G.studio.tracks.push(track);
-  G.studio.released=(G.studio.released||0)+1;
-  G.studio.revenue=parseFloat(((G.studio.revenue||0)+revenue).toFixed(8));
-  addBTC(revenue,'Studio: '+track.name);addFans(Math.floor(streams*.02));addNot(Math.floor(streams*.005));
-  toast('🎙 Released: "'+track.name+'" · '+streams.toLocaleString()+' streams · +₿'+revenue.toFixed(5));
-  ui();rStudio();saveGame();
-}
-function renderDiscography(){
-  const el=document.getElementById('st2-discog'); if(!el) return;
-  if(!(G.studio.tracks||[]).length){el.textContent='No tracks recorded yet.';return;}
-  el.innerHTML=(G.studio.tracks||[]).slice().reverse().slice(0,8).map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:32px;height:32px;border-radius:6px;background:rgba(108,63,255,.2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🎵</div><div style="flex:1"><div style="font-weight:700;font-size:11px">"${t.name}"</div><div style="font-size:10px;color:var(--text2)">${t.genre} · ${t.qual} · ${t.streams.toLocaleString()} streams</div></div><div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--gold)">₿${t.revenue.toFixed(5)}</div></div>`).join('');
-}
+/* dup rStudio removed */ 
+/* dup initStudioCanvas removed */ 
+/* dup drawStudioLoop removed */ 
+/* dup setStudioGenre removed */ 
+/* dup setStudioQual removed */ 
+/* dup recordTrack removed */ 
+/* dup renderDiscography removed */ 
 
 // ── MULTIVERSE MAP ──
-function rMultiverse(){
-  const screen=document.getElementById('screen-multiverse');
-  if(!document.getElementById('mv-canvas-wrap')){
-    const existing=screen.querySelector('.ptitle');
-    const wrap=document.createElement('div');
-    wrap.id='mv-canvas-wrap';
-    wrap.style.cssText='position:relative;margin-bottom:10px';
-    wrap.innerHTML=`<canvas id="mv-map" style="width:100%;border-radius:16px;display:block;background:#010108;cursor:pointer" height="280"></canvas>`;
-    if(existing) existing.after(wrap);
-    else screen.prepend(wrap);
-    const info=document.createElement('div');
-    info.id='mv-node-info';info.className='card';info.style.display='none';
-    info.innerHTML=`<div style="display:flex;align-items:center;gap:12px"><span style="font-size:36px" id="mv-ni-ic">🌍</span><div style="flex:1"><div style="font-family:'Orbitron',monospace;font-weight:900;font-size:14px" id="mv-ni-name">Zone</div><div style="font-size:11px;color:var(--text2);margin-top:3px" id="mv-ni-desc"></div></div><button class="btn bp" onclick="enterMVNode()" id="mv-ni-btn" style="font-family:'Orbitron',monospace;font-size:10px;padding:8px 14px">ENTER</button></div>`;
-    wrap.after(info);
-  }
-  initMVMap();
-}
+// [duplicate rMultiverse removed]
 function initMVMap(){
   mvCanvas=document.getElementById('mv-map'); if(!mvCanvas) return;
   mvCtx=mvCanvas.getContext('2d');
@@ -3461,53 +3268,9 @@ function initMVMap(){
   mvCanvas.onclick=mvClickHandler;
   drawMVLoop();
 }
-function drawMVLoop(){
-  mvAnim=requestAnimationFrame(drawMVLoop);mvFrame++;
-  if(!mvCtx||!mvCanvas) return;
-  const W=mvCanvas.offsetWidth||320,H=280;
-  if(mvCanvas.width!==W){mvCanvas.width=W;mvCanvas.height=H;}
-  const ctx=mvCtx;
-  ctx.fillStyle='#010108';ctx.fillRect(0,0,W,H);
-  // Nebula
-  [[W*.3,H*.4,'#1a0040'],[W*.7,H*.3,'#002244'],[W*.5,H*.7,'#001a10']].forEach(([cx,cy,c])=>{
-    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.4);g.addColorStop(0,c+'cc');g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  });
-  // Stars
-  for(let i=0;i<80;i++){const sx=Math.sin(i*127.1)*W*.5+W*.5,sy=Math.cos(i*311.7)*H*.5+H*.5,sa=Math.abs(Math.sin(mvFrame*.02+i))*.6+.1;ctx.fillStyle=`rgba(255,255,255,${sa})`;ctx.beginPath();ctx.arc(sx,sy,.8,0,Math.PI*2);ctx.fill();}
-  // Nodes
-  MV_NODES.forEach(node=>{
-    const nx=node.x*W,ny=node.y*H,unlocked=G.not>=node.req,sel=mvSelected===node.id;
-    const pulse=Math.sin(mvFrame*.06+node.x*10)*.5+.5;
-    if(unlocked){const glow=ctx.createRadialGradient(nx,ny,0,nx,ny,28+pulse*6);glow.addColorStop(0,node.color+'33');glow.addColorStop(1,'transparent');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(nx,ny,34,0,Math.PI*2);ctx.fill();}
-    if(sel){ctx.save();ctx.strokeStyle=node.color;ctx.lineWidth=2;ctx.globalAlpha=.8+pulse*.2;ctx.beginPath();ctx.arc(nx,ny,22+pulse*3,0,Math.PI*2);ctx.stroke();ctx.restore();}
-    ctx.fillStyle=unlocked?node.color+'44':'rgba(30,30,60,.6)';ctx.strokeStyle=unlocked?node.color:'rgba(60,60,100,.4)';ctx.lineWidth=sel?2.5:1.5;ctx.beginPath();ctx.arc(nx,ny,14,0,Math.PI*2);ctx.fill();ctx.stroke();
-    ctx.save();ctx.globalAlpha=unlocked?1:.3;ctx.font='14px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(node.ic,nx,ny);ctx.restore();
-    ctx.save();ctx.globalAlpha=unlocked?(.6+pulse*.2):.2;ctx.font='700 8px Orbitron,monospace';ctx.textAlign='center';ctx.fillStyle=unlocked?node.color:'#555';ctx.fillText(node.n.toUpperCase(),nx,ny+24);ctx.restore();
-  });
-}
-function mvClickHandler(e){
-  const rect=mvCanvas.getBoundingClientRect();
-  const mx=(e.clientX-rect.left)*(mvCanvas.width/rect.width),my=(e.clientY-rect.top)*(280/rect.height);
-  MV_NODES.forEach(node=>{
-    if(Math.hypot(mx-node.x*mvCanvas.width,my-node.y*280)<22){
-      mvSelected=node.id;
-      const unlocked=G.not>=node.req;
-      const infoEl=document.getElementById('mv-node-info');
-      if(infoEl){
-        infoEl.style.display='block';
-        document.getElementById('mv-ni-ic').textContent=node.ic;
-        document.getElementById('mv-ni-name').textContent=node.n;
-        const btn=document.getElementById('mv-ni-btn');
-        if(unlocked){btn.disabled=false;btn.textContent='ENTER ZONE';}
-        else{btn.disabled=true;btn.textContent='LOCKED — '+node.req.toLocaleString()+' NOT';}
-      }
-    }
-  });
-}
-function enterMVNode(){
-  if(!mvSelected) return;
-  go('clubs');toast('🌌 Entering '+mvSelected+' zone!');
-}
+/* dup drawMVLoop removed */ 
+/* dup mvClickHandler removed */ 
+/* dup enterMVNode removed */ 
 
 // ── PLAYABLE GIG (clean version with all bonuses) ──
 (function patchPlayGig(){
@@ -3904,26 +3667,7 @@ window.playGig=function(i){
 };
 
 // ── SINGLE MASTER go() DISPATCHER ──
-(function(){
-  const _base=go;
-  // [go() patch removed - handled by master go()]
-    Object.keys(stops).forEach(k=>{if(scr!==k)try{stops[k]();}catch(e){}});
-    _base(scr);
-    // Route to new systems
-    const routes={
-      quests:rQuests,skilltree:rSkillTree,tournament:rTournament,visualizer:rVisualizer,
-      performance:rPerformance,analytics:rAnalytics,faction:rFaction,territory:rTerritory,
-      nft:rNFT,radio:rRadio,collab:rCollab,environment:rEnvironment,
-      friends:rFriends,notifications:()=>{rNotifications();markAllRead();},realworld:rRealWorld,
-      djschool:rDJSchool,marketplace:rMarketplace,calendar:rCalendar,royale:rRoyale,
-      clones:rClones,vip:rVIP,awards:()=>{rAwards();try{checkAwardEligibility();}catch(e){}},
-      legacy2:rLegacy2,soundboard:rSoundboard,studio:rStudio,multiverse:rMultiverse,
-    };
-    if(routes[scr]) try{routes[scr]();}catch(e){console.warn('Route error '+scr,e);}
-    if(scr==='home') setTimeout(()=>{try{checkAwardEligibility();}catch(e){}},500);
-    setTimeout(()=>{try{checkQuestProgress();}catch(e){}},200);
-  };
-})();
+// [go() orphan patch removed - routes handled by master go()]
 
 // ── INIT ──
 initGExtensions();
@@ -4505,71 +4249,16 @@ let sunoUsername = '';
 let sunoModalOpen = false;
 
 // ── Init on load / on mixer open ──
-function initSunoCard(){
-  // Load saved username from G state
-  if(G.suno && G.suno.username){
-    sunoUsername = G.suno.username;
-    showSunoLinked(sunoUsername);
-  } else {
-    showSunoUnlinked();
-  }
-}
+/* dup initSunoCard removed */ 
 
-function showSunoUnlinked(){
-  const unlinked = document.getElementById('suno-unlinked');
-  const linked   = document.getElementById('suno-linked');
-  const badge    = document.getElementById('suno-status-badge');
-  if(unlinked) unlinked.style.display = 'block';
-  if(linked)   linked.style.display   = 'none';
-  if(badge){
-    badge.textContent = 'NOT LINKED';
-    badge.style.color = 'rgba(200,128,255,.6)';
-    badge.style.borderColor = 'rgba(160,80,255,.25)';
-    badge.style.background = 'rgba(160,80,255,.1)';
-  }
-}
+/* dup showSunoUnlinked removed */ 
 
-function showSunoLinked(username){
-  const unlinked = document.getElementById('suno-unlinked');
-  const linked   = document.getElementById('suno-linked');
-  const badge    = document.getElementById('suno-status-badge');
-  const nameEl   = document.getElementById('suno-display-name');
-  const handleEl = document.getElementById('suno-handle');
-  if(unlinked) unlinked.style.display = 'none';
-  if(linked)   linked.style.display   = 'block';
-  if(nameEl)   nameEl.textContent     = username;
-  if(handleEl) handleEl.textContent   = '@' + username.toLowerCase().replace(/\s+/g,'_');
-  if(badge){
-    badge.textContent = '✓ LINKED';
-    badge.style.color = '#00ff88';
-    badge.style.borderColor = 'rgba(0,255,136,.3)';
-    badge.style.background = 'rgba(0,255,136,.08)';
-  }
-}
+/* dup showSunoLinked removed */ 
 
 // ── Modal open/close ──
-function openSunoModal(){
-  const modal = document.getElementById('suno-modal');
-  if(!modal) return;
-  modal.style.display = 'flex';
-  sunoModalOpen = true;
-  // Reset to step 1
-  showSunoStep(1);
-  const inp = document.getElementById('suno-username-input');
-  if(inp){
-    inp.value = sunoUsername || '';
-    sunoUsernameInput(inp.value);
-    setTimeout(()=> inp.focus(), 100);
-  }
-  // Close on backdrop click
-  modal.onclick = (e)=>{ if(e.target===modal) closeSunoModal(); };
-}
+/* dup openSunoModal removed */ 
 
-function closeSunoModal(){
-  const modal = document.getElementById('suno-modal');
-  if(modal) modal.style.display = 'none';
-  sunoModalOpen = false;
-}
+/* dup closeSunoModal removed */ 
 
 function showSunoStep(n){
   document.getElementById('suno-step-1').style.display = n===1 ? 'block' : 'none';
@@ -4581,104 +4270,23 @@ function showSunoStep(n){
 }
 
 // ── Username input validation ──
-function sunoUsernameInput(val){
-  const cleaned = val.trim().replace(/^@/,'');
-  const hint    = document.getElementById('suno-input-hint');
-  const btn     = document.getElementById('suno-step1-btn');
-  if(!cleaned){
-    if(hint) hint.textContent = '';
-    if(btn){ btn.disabled = true; btn.style.cursor='not-allowed'; btn.style.color='#ffffff88'; btn.style.background='linear-gradient(135deg,#6030aa,#aa2080)'; }
-    return;
-  }
-  const valid = /^[a-zA-Z0-9_\-\.]{2,30}$/.test(cleaned);
-  if(valid){
-    if(hint){ hint.textContent = '✓ suno.com/@' + cleaned; hint.style.color = '#00ff88'; }
-    if(btn){ btn.disabled = false; btn.style.cursor='pointer'; btn.style.color='#fff'; btn.style.background='linear-gradient(135deg,#a050ff,#ff30aa)'; }
-  } else {
-    if(hint){ hint.textContent = 'Use letters, numbers, _ or - only.'; hint.style.color = '#ff6688'; }
-    if(btn){ btn.disabled = true; btn.style.cursor='not-allowed'; btn.style.color='#ffffff88'; btn.style.background='linear-gradient(135deg,#6030aa,#aa2080)'; }
-  }
-}
+/* dup sunoUsernameInput removed */ 
 
-function sunoStep1Next(){
-  const inp = document.getElementById('suno-username-input');
-  if(!inp) return;
-  const cleaned = inp.value.trim().replace(/^@/,'');
-  if(!cleaned || !/^[a-zA-Z0-9_\-\.]{2,30}$/.test(cleaned)) return;
-  // Populate step 2 confirm
-  const confirmName = document.getElementById('suno-confirm-name');
-  const confirmUrl  = document.getElementById('suno-confirm-url');
-  if(confirmName) confirmName.textContent = cleaned;
-  if(confirmUrl)  confirmUrl.textContent  = 'suno.com/@' + cleaned;
-  showSunoStep(2);
-}
+/* dup sunoStep1Next removed */ 
 
-function sunoGoBack(){
-  showSunoStep(1);
-}
+/* dup sunoGoBack removed */ 
 
 // ── Confirm & save link ──
-function sunoConfirmLink(){
-  const inp = document.getElementById('suno-username-input');
-  if(!inp) return;
-  const cleaned = inp.value.trim().replace(/^@/,'');
-  if(!cleaned) return;
-  // Save to G state
-  if(!G.suno) G.suno = {};
-  G.suno.username = cleaned;
-  G.suno.linkedAt = Date.now();
-  sunoUsername = cleaned;
-  // Close modal
-  closeSunoModal();
-  // Update card
-  showSunoLinked(cleaned);
-  // Save game
-  saveGame();
-  // Toast + bonus
-  toast('🎵 Suno linked: @' + cleaned + ' · +500 NOT bonus!');
-  addNot(500);
-  try{ pushNotification('🎵 Suno linked! @'+cleaned,'reward','🎵'); }catch(e){}
-  ui();
-}
+/* dup sunoConfirmLink removed */ 
 
 // ── Open Suno in new tab ──
-function openSuno(){
-  const user = G.suno && G.suno.username;
-  const url  = user ? 'https://suno.com/@' + user : 'https://suno.com';
-  window.open(url, '_blank', 'noopener,noreferrer');
-  // Award small notoriety for cross-platform use
-  addNot(25);
-  ui();
-}
+/* dup openSuno removed */ 
 
 // ── Quick action buttons ──
-function sunoAction(type){
-  const user = G.suno && G.suno.username;
-  const urls = {
-    create:  'https://suno.com/create',
-    library: user ? 'https://suno.com/@' + user : 'https://suno.com/library',
-    explore: 'https://suno.com/explore',
-    trending:'https://suno.com/trending',
-  };
-  const url = urls[type] || 'https://suno.com';
-  window.open(url, '_blank', 'noopener,noreferrer');
-  // Small in-game reward for creating music externally
-  if(type === 'create'){
-    addNot(50); addBTC(.00001,'Suno Create Bonus');
-    toast('🎵 Suno Create opened · +50 NOT');
-    ui();
-  }
-}
+/* dup sunoAction removed */ 
 
 // ── Unlink ──
-function unlinkSuno(){
-  if(!confirm('Unlink your Suno account?')) return;
-  if(G.suno) G.suno.username = '';
-  sunoUsername = '';
-  showSunoUnlinked();
-  saveGame();
-  toast('Suno account unlinked.');
-}
+/* dup unlinkSuno removed */ 
 
 // ── Patch go() to init suno card when mixer opens ──
 // [go() suno patch removed - handled by master go()]
@@ -4702,14 +4310,7 @@ function getSunoState(){
 }
 
 // ── On mixer screen load — sync UI to saved state ──
-function initSunoUI(){
-  const s=getSunoState();
-  if(s.linked){
-    showSunoLinked(s);
-  } else {
-    showSunoUnlinked();
-  }
-}
+/* dup initSunoUI removed */ 
 
 function showSunoLinked(s){
   const el1=document.getElementById('suno-unlinked');
@@ -4877,13 +4478,7 @@ function sunoAction(type){
   if(type==='create'){addNot(50);toast('🎵 Creating in Suno → game still running!');}
 }
 
-function unlinkSuno(){
-  const s=getSunoState();
-  s.linked=false; s.username=''; s.displayName=''; s.avatar='🎧';
-  showSunoUnlinked();
-  toast('Suno account unlinked.');
-  saveGame();
-}
+/* dup unlinkSuno removed */ 
 
 // ── Auto-init when mixer screen opens ──
 // Hook into go() - Suno init on mixer screen
@@ -5185,53 +4780,7 @@ const LB_PLAYERS=[
   {n:'PHANTOM WAVE',not:4500000,av:'👻',loc:'LA'},
 ];
 
-function rLeaderboard(){
-  const screen=document.getElementById('screen-leaderboard');
-  if(!screen) return;
-  const playerNot=G.not;
-  const all=[...LB_PLAYERS,{n:(G.prof&&G.prof.nm)||'YOU',not:playerNot,av:G.prof&&G.prof.av||'🎧',loc:'Universal',isPlayer:true}]
-    .sort((a,b)=>b.not-a.not);
-  const playerRank=all.findIndex(p=>p.isPlayer)+1;
-  const maxNot=all[0].not||1;
-
-  screen.innerHTML=`
-    <div class="ptitle">🏆 GLOBAL LEADERBOARD</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
-      <div class="card" style="margin:0;text-align:center;padding:10px 4px">
-        <div style="font-size:8px;color:var(--text3);font-family:'Orbitron',monospace">YOUR RANK</div>
-        <div style="font-size:20px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace">#${playerRank}</div>
-      </div>
-      <div class="card" style="margin:0;text-align:center;padding:10px 4px">
-        <div style="font-size:8px;color:var(--text3);font-family:'Orbitron',monospace">YOUR NOT</div>
-        <div style="font-size:13px;font-weight:900;color:var(--p3);font-family:'Orbitron',monospace">${playerNot.toLocaleString()}</div>
-      </div>
-      <div class="card" style="margin:0;text-align:center;padding:10px 4px">
-        <div style="font-size:8px;color:var(--text3);font-family:'Orbitron',monospace">PLAYERS</div>
-        <div style="font-size:20px;font-weight:900;color:var(--cyan);font-family:'Orbitron',monospace">${all.length}</div>
-      </div>
-    </div>
-    <div class="card">
-      ${all.map((p,i)=>{
-        const pct=Math.max(2,(p.not/maxNot)*100);
-        const cols=['#ffd700','#c0c0c0','#cd7f32'];
-        const rankCol=i<3?cols[i]:(p.isPlayer?'var(--p3)':'var(--text2)');
-        return `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);${p.isPlayer?'background:rgba(108,63,255,.06);margin:0 -12px;padding:8px 12px;border-radius:8px;':''}">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <div style="font-family:'Orbitron',monospace;font-weight:900;font-size:12px;color:${rankCol};min-width:24px">#${i+1}</div>
-            <span style="font-size:18px">${p.av}</span>
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:12px;color:${p.isPlayer?'var(--p3)':'var(--text)'}">${p.n}${p.isPlayer?' (YOU)':''}</div>
-              <div style="font-size:9px;color:var(--text3);font-family:'Orbitron',monospace">${p.loc||''}</div>
-            </div>
-            <div style="font-family:'Orbitron',monospace;font-size:10px;font-weight:700;color:${rankCol}">${p.not.toLocaleString()}</div>
-          </div>
-          <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.06)">
-            <div style="height:100%;border-radius:2px;width:${pct}%;background:${p.isPlayer?'linear-gradient(90deg,var(--p),var(--cyan))':rankCol+'99'};transition:width .5s ease"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-}
+// [duplicate rLeaderboard removed]
 
 // ════════════════════════════════════════════════════════════
 // ACHIEVEMENTS: ANIMATED UNLOCK REVEALS
@@ -5885,20 +5434,20 @@ const AUD = (() => {
 })();
 
 // === HOOK AUDIO INTO GAME EVENTS ===
-const _origAddNot = addNot;
+var _origAddNot = addNot;
 window.addNot = function(a) {
   const prev = curTier().l;
   _origAddNot(a);
   try{if(curTier().l>prev)AUD.tierUp();}catch(e){}
 };
 
-const _origPlayGig = playGig;
+var _origPlayGig = playGig;
 window.playGig = function(i) {
   try{AUD.uiClick();AUD.startBeat(i<3?'house':i<5?'techno':'dnb');AUD.notification();}catch(e){}
   _origPlayGig(i);
 };
 
-const _origDoBattle = doBattle;
+var _origDoBattle = doBattle;
 window.doBattle = function() {
   try{AUD.uiClick();}catch(e){}
   const prevWins = G.wins;
@@ -5906,39 +5455,39 @@ window.doBattle = function() {
   try{if(G.wins>prevWins){AUD.victory();AUD.setCrowdLevel(0.9);}else{AUD.drop();}}catch(e){}
 };
 
-const _origHp = hp;
+var _origHp = hp;
 window.hp = function(k) {
   const wasCur = tCur;
   _origHp(k);
   try{if(wasCur===k)AUD.padHit(k.charCodeAt(0)%6,true);else AUD.padHit(0,false);}catch(e){}
 };
 
-const _origScm = scm;
+var _origScm = scm;
 window.scm = function(e) {
   try{if(scMD&&scAct)AUD.scratchSound(Math.min(1,Math.abs((e.clientX-scLX)/30)));}catch(e2){}
   _origScm(e);
 };
 
-const _origTogDeck = togDeck;
+var _origTogDeck = togDeck;
 window.togDeck = function(d) {
   _origTogDeck(d);
   try{const styles=['house','techno','trap','dnb'];if(G.mx.pA||G.mx.pB)AUD.startBeat(styles[G.mx.trks%styles.length]);else if(!G.mx.pA&&!G.mx.pB)AUD.stopBeat();}catch(e){}
 };
 
-const _origTogFX = togFX;
+var _origTogFX = togFX;
 window.togFX = function(btn) {
   _origTogFX(btn);
   try{AUD.riser(null,0.3);}catch(e){}
 };
 
-const _origToast = toast;
+var _origToast = toast;
 window.toast = function(msg,err,big) {
   _origToast(msg,err,big);
   try{if(big)AUD.tierUp();else AUD.notification();}catch(e){}
 };
 
 // Patch boost for instant demo gratification
-const _origBoost = boost;
+var _origBoost = boost;
 window.boost = function(type, amt) {
   try{AUD.uiClick();}catch(e){}
   _origBoost(type, amt);
@@ -5946,14 +5495,14 @@ window.boost = function(type, amt) {
 };
 
 // Patch joinEv
-const _origJoinEv = joinEv;
+var _origJoinEv = joinEv;
 window.joinEv = function(i) {
   try{AUD.startBeat('techno');AUD.notification();}catch(e){}
   _origJoinEv(i);
 };
 
 // Patch godAct
-const _origGodAct = godAct;
+var _origGodAct = godAct;
 window.godAct = function(type) {
   try{if(type==='chaos')AUD.drop();else AUD.riser(null,0.8);}catch(e){}
   _origGodAct(type);
@@ -5991,7 +5540,7 @@ const CAMPAIGN_CHAPTERS=[
   },
   {
     id:3,n:'Chapter 3: Industry Recognition',
-    desc:'You've crossed into the industry. Labels are watching, investors are interested, and the world is your stage.',
+    desc:'You\'ve crossed into the industry. Labels are watching, investors are interested, and the world is your stage.',
     missions:[
       {id:'c3m1',n:'First Fusion',desc:'Execute a clone fusion',req:()=>(G.clones?.totalFusions||0)>=1,reward:{btc:.05,not:3000,xp:2000},done:false},
       {id:'c3m2',n:'10K Fans',desc:'Reach 10,000 fans',req:()=>(G.fans||0)>=10000,reward:{btc:.08,not:5000,xp:3000},done:false},
@@ -6274,7 +5823,7 @@ function triggerAbductionSequence(cloud){
     desc.textContent=ALIEN_COUNCIL_MSGS[cloud.c]||cloud.p;
     setTimeout(()=>{if(banner)banner.style.display='none';},6000);
   }
-  toast('🛸 ALIEN ABDUCTION! You've been taken to the Council! Navigate to 🛸 Alien Council.');
+  toast('🛸 ALIEN ABDUCTION! You\'ve been taken to the Council! Navigate to 🛸 Alien Council.');
 }
 
 function signAlienContract(){
@@ -6657,7 +6206,7 @@ setInterval(()=>{
 
 // ─── CLOUD MILESTONE AUTO-CHECK ──────────────────────────────────────
 // Check on every notoriety gain if player crossed a cloud threshold
-const _origAddBTC2=window.addBTC;
+var _origAddBTC2=window.addBTC;
 (function(){
   let _lastCloudCheck=0;
   function periodicCloudCheck(){
@@ -6722,7 +6271,7 @@ const LB_LIVE_EVENTS=[
   'PHANTOM WAVE challenged CIPHER BLADE to a battle 🥊',
   'FREQUENCY KING signed a new rapper to Talent Empire 🎤',
   'QUANTUM SOUND just earned ₿0.5 Cloud signing bonus 🛸',
-  'NEON ARCHITECT's abduction squad is active ⚡',
+  'NEON ARCHITECT\'s abduction squad is active ⚡',
 ];
 
 function rLeaderboard(){
@@ -6754,7 +6303,7 @@ function _extLeaderboard(){
   } else if(_lbCurrentFilter==='weekly'){
     // Simulate weekly by slightly shuffling
     pool=[...LB_EXT,playerEntry].sort((a,b)=>b.not*(.9+Math.random()*.2)-a.not*(.9+Math.random()*.2));
-    title='THIS WEEK'S TOP PERFORMERS';
+    title="THIS WEEK'S TOP PERFORMERS";
   }
 
   const playerRank=pool.findIndex(p=>p.isPlayer)+1;
@@ -7002,10 +6551,6 @@ function _injectHomeSystems(){
 }
 
 // Patch rHome to include systems status
-const _origRHome=window.rHome;
-if(typeof _origRHome==='function'){
-  window.rHome=function(){_origRHome();setTimeout(_injectHomeSystems,100);};
-}
 // Initial injection
 setTimeout(_injectHomeSystems,2000);
 
@@ -7016,10 +6561,11 @@ setTimeout(_injectHomeSystems,2000);
 
 // ─── ENHANCED rHome — add identity + cloud badge ────────────────────
 (function patchRHome(){
+  try{
   const orig=window.rHome;
   if(typeof orig!=='function')return;
   window.rHome=function(){
-    orig();
+    try{orig();}catch(e){console.warn('rHome orig error:',e);}
     // Update identity bar
     const nm=document.getElementById('h-djname');
     const av=document.getElementById('h-avatar');
@@ -7044,8 +6590,9 @@ setTimeout(_injectHomeSystems,2000);
         cp.style.color=needed<=0?'var(--green)':'var(--text3)';
       }
     }
-    setTimeout(_injectHomeSystems,80);
+    setTimeout(function(){try{_injectHomeSystems();}catch(e){}},80);
   };
+  }catch(e){console.warn('patchRHome setup error:',e);}
 })();
 
 // ─── SONY DEMO TOUR ──────────────────────────────────────────────────
@@ -7137,7 +6684,7 @@ setInterval(()=>{
 
 // ─── EXTRA QUALITY OF LIFE ───────────────────────────────────────────
 // Fix: boost function extended to handle fan boosts
-const _origBoost=window.boost;
+var _origBoost=window.boost;
 window.boost=function(type,amt){
   if(type==='fans'){G.fans=(G.fans||0)+amt;ui();return;}
   _origBoost(type,amt);
@@ -7314,7 +6861,7 @@ function initSunoCard(){initSunoUI();}
 
 // Fix sunoConfirmLink to write to BOTH systems
 (function(){
-  const _origConfirm=window.sunoConfirmLink;
+  var _origConfirm=window.sunoConfirmLink;
   window.sunoConfirmLink=function(){
     const inp=document.getElementById('suno-username-input');
     if(!inp||!inp.value.trim()){toast('Enter your Suno username',true);return;}
@@ -7878,5 +7425,13 @@ function initSunoCard(){initSunoUI();}
   </div>
 </div>
 
+
+<!-- Hidden legacy element stubs -->
+<span id="an-apg" style="display:none"></span>
+<span id="an-pfans" style="display:none"></span>
+<span id="fr-chal" style="display:none"></span>
+<span id="q-reset" style="display:none"></span>
+<span id="world-event-log" style="display:none"></span>
+<span id="world-time-label" style="display:none"></span>
 </body>
 </html>

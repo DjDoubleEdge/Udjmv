@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Universal DJ Multi-Verse — The Architect Edition</title>
+
+<!-- ═══════════════════════════════════════════════════════════
+     THREE.JS — loaded async so it never blocks the game
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.async=true;
+  s.onload=()=>{window._threeLoaded=true;if(window._threeQueue)window._threeQueue.forEach(fn=>fn());window._threeQueue=[];};
+  document.head.appendChild(s);
+  window._threeQueue=[];
+  window.onThreeReady=fn=>{if(window._threeLoaded)fn();else window._threeQueue.push(fn);};
+})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Cinzel+Decorative:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   MAIN GAME STYLES — paste into your existing <style> block
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --void:#000;--gold:#f0c84a;--gold-dim:rgba(240,200,74,.32);
+  --font-display:'Cinzel Decorative','Cinzel',serif;
+  --font-title:'Cinzel',serif;
+  --font-body:'Cormorant Garamond',Georgia,serif;
+  --font-mono:'Courier New',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--void);font-family:var(--font-body);
+  color:#e8f0ff;overflow:hidden;width:100%;height:100%;
+  background-image:radial-gradient(ellipse 80% 30% at 50% -8%,rgba(200,230,255,.06),transparent 55%),
+    radial-gradient(ellipse 100% 100% at 50% 50%,#030210 0%,#000 80%);
+}
+
+/* ── MAIN GAME SCREENS ── */
+#gameWrapper{position:fixed;inset:0;overflow:hidden;}
+.game-screen{position:absolute;inset:0;overflow-y:auto;display:none;}
+.game-screen.active{display:block;}
+
+/* Club grid screen */
+#clubScreen{background:var(--void);}
+.screen-header{text-align:center;padding:60px 20px 36px;position:relative;}
+.sh-eyebrow{font-family:var(--font-mono);font-size:.52rem;letter-spacing:.4em;color:rgba(120,90,30,.55);text-transform:uppercase;margin-bottom:12px;}
+.sh-title{font-family:var(--font-display);font-size:clamp(1.6rem,4vw,2.8rem);color:#e8f0ff;text-shadow:0 0 60px rgba(200,230,255,.14);margin-bottom:6px;}
+.sh-sub{font-family:var(--font-body);font-style:italic;font-size:.88rem;color:rgba(180,160,110,.4);margin-bottom:28px;}
+
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:0 20px;margin-bottom:32px;}
+.fb{padding:6px 16px;background:transparent;border:1px solid rgba(200,160,50,.14);border-radius:20px;font-family:var(--font-mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(160,130,58,.48);cursor:pointer;transition:all .22s;}
+.fb:hover{border-color:rgba(240,200,74,.3);color:#f0c84a;}
+.fb.active{background:rgba(240,200,74,.07);border-color:rgba(240,200,74,.38);color:#f0c84a;}
+
+.club-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px;padding:0 24px 80px;max-width:1400px;margin:0 auto;}
+
+/* Club card */
+.club-card{
+  position:relative;border-radius:15px;overflow:hidden;cursor:pointer;
+  transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s;
+  animation:card-rise .5s ease both;
+  background:var(--card-bg,rgba(5,3,15,.97));
+  border:1px solid var(--card-border,rgba(180,210,255,.08));
+  box-shadow:0 18px 55px rgba(0,0,0,.8);
+}
+@keyframes card-rise{from{opacity:0;transform:translateY(22px) scale(.97);}to{opacity:1;transform:none;}}
+.club-card:hover{transform:translateY(-5px) scale(1.008);border-color:var(--card-border-hover,rgba(240,200,74,.28));box-shadow:0 0 44px var(--card-glow,rgba(180,200,255,.07)),0 28px 72px rgba(0,0,0,.9);}
+
+.club-stage{position:relative;height:200px;overflow:hidden;}
+.club-stage canvas{position:absolute;inset:0;width:100%;height:100%;}
+.club-stage::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(0,0,0,.08) 55%,var(--card-bg,rgba(5,3,15,.97)) 100%);pointer-events:none;}
+.club-tier-badge{position:absolute;top:12px;left:12px;z-index:2;padding:3px 9px;border:1px solid var(--card-accent-dim,rgba(240,200,74,.28));border-radius:2px;font-family:var(--font-mono);font-size:.48rem;letter-spacing:.14em;text-transform:uppercase;color:var(--card-accent,#f0c84a);background:rgba(0,0,0,.52);backdrop-filter:blur(6px);}
+.club-prestige{position:absolute;top:12px;right:12px;z-index:2;display:flex;gap:2px;}
+.prestige-star{font-size:.6rem;filter:drop-shadow(0 0 4px var(--card-accent,#f0c84a));}
+
+.club-body{padding:16px 18px 18px;}
+.club-location{font-family:var(--font-mono);font-size:.48rem;letter-spacing:.18em;color:var(--card-accent-dim,rgba(160,130,58,.42));text-transform:uppercase;margin-bottom:5px;}
+.club-name{font-family:var(--font-display);font-size:1.08rem;letter-spacing:.05em;color:#e8f0ff;text-shadow:0 0 28px var(--card-glow,rgba(180,200,255,.18));margin-bottom:3px;line-height:1.15;}
+.club-tagline{font-family:var(--font-body);font-size:.72rem;font-style:italic;font-weight:300;color:var(--card-accent-dim,rgba(180,160,110,.42));margin-bottom:12px;line-height:1.5;}
+.club-divider{height:1px;margin-bottom:12px;background:linear-gradient(90deg,transparent,var(--card-accent-dim,rgba(200,160,50,.18)) 30%,var(--card-accent,rgba(200,160,50,.38)) 50%,var(--card-accent-dim,rgba(200,160,50,.18)) 70%,transparent);}
+.club-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:14px;}
+.club-stat{text-align:center;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:5px;padding:7px 3px;}
+.cs-val{font-family:var(--font-mono);font-size:.74rem;color:var(--card-accent,#f0c84a);margin-bottom:2px;display:block;}
+.cs-lbl{font-family:var(--font-mono);font-size:.42rem;letter-spacing:.1em;color:rgba(140,110,48,.42);text-transform:uppercase;}
+.club-desc{font-family:var(--font-body);font-size:.7rem;font-weight:300;color:rgba(180,165,128,.42);line-height:1.62;margin-bottom:14px;}
+.club-special{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;background:linear-gradient(90deg,rgba(var(--card-rgb,200,160,50),.06),transparent);border-left:2px solid var(--card-accent,rgba(240,200,74,.38));border-radius:0 4px 4px 0;margin-bottom:14px;}
+.cs-icon{font-size:.9rem;flex-shrink:0;margin-top:1px;}
+.cs-text{font-family:var(--font-body);font-size:.66rem;font-weight:300;color:rgba(180,160,108,.58);line-height:1.5;}
+.cs-text strong{color:var(--card-accent,rgba(240,200,74,.88));font-weight:400;}
+.club-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.club-btn{flex:1;min-width:0;padding:9px 7px;font-family:var(--font-title);font-size:.54rem;letter-spacing:.15em;text-transform:uppercase;border-radius:3px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;border:1px solid;}
+.club-btn:active{transform:scale(.97);}
+.cb-book{background:linear-gradient(145deg,rgba(var(--card-rgb,200,160,50),.15),rgba(var(--card-rgb,160,120,30),.07));border-color:var(--card-accent-dim,rgba(200,160,50,.32));color:var(--card-accent,#f0c84a);}
+.cb-book:hover{border-color:var(--card-accent,#f0c84a);}
+.cb-own{background:rgba(var(--card-rgb,200,160,50),.07);border-color:var(--card-accent-dim,rgba(200,160,50,.18));color:rgba(var(--card-rgb,200,160,50),.65);}
+.cb-own:hover{border-color:var(--card-accent,#f0c84a);}
+.cb-perform{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.06);color:rgba(180,165,128,.48);}
+.cb-perform:hover{border-color:rgba(255,255,255,.14);color:rgba(200,185,148,.68);}
+
+/* ★ ENTER CLUB BUTTON — THE KEY INTEGRATION ★ */
+.cb-enter-3d{
+  width:100%;margin-top:8px;padding:10px 0;
+  background:linear-gradient(135deg,rgba(var(--card-rgb,200,160,50),.14) 0%,rgba(var(--card-rgb,200,160,50),.06) 100%);
+  border:1px solid var(--card-accent-dim,rgba(200,160,50,.28));
+  border-radius:3px;
+  font-family:var(--font-title);font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--card-accent,#f0c84a);cursor:pointer;
+  position:relative;overflow:hidden;transition:all .25s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.cb-enter-3d::before{
+  content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);
+  transition:left .4s;
+}
+.cb-enter-3d:hover{border-color:var(--card-accent,#f0c84a);background:linear-gradient(135deg,rgba(var(--card-rgb,200,160,50),.22) 0%,rgba(var(--card-rgb,200,160,50),.1) 100%);}
+.cb-enter-3d:hover::before{left:150%;}
+.cb-enter-3d:active{transform:scale(.98);}
+.enter-icon{font-size:.9rem;}
+
+/* Lock overlay */
+.club-locked{position:absolute;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(2px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;border-radius:inherit;}
+.lock-icon{font-size:1.9rem;opacity:.38;margin-bottom:7px;}
+.lock-text{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.14em;color:rgba(180,160,108,.38);text-transform:uppercase;text-align:center;max-width:150px;line-height:1.5;}
+
+/* Toast */
+#gameToast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(18px);background:rgba(4,2,12,.98);border:1px solid rgba(200,160,50,.32);border-radius:4px;padding:9px 20px;color:#f0c84a;font-family:var(--font-mono);font-size:.68rem;z-index:9999;opacity:0;transition:opacity .28s,transform .28s;text-align:center;max-width:340px;pointer-events:none;}
+
+/* ═══════════════════════════════════════════════════════════
+   IMMERSIVE 3D OVERLAY STYLES
+   ═══════════════════════════════════════════════════════════ */
+#udj-3d-overlay{
+  position:fixed;inset:0;z-index:8000;
+  display:none;background:#000;
+}
+#udj-3d-overlay.active{display:block;}
+#udj-3d-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+/* Beat flash */
+#udj-beat-flash{position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,0);transition:background .08s;z-index:8004;}
+
+/* HUD */
+#udj-hud{position:absolute;inset:0;pointer-events:none;z-index:8010;}
+#udj-hud-top{
+  position:absolute;top:0;left:0;right:0;
+  padding:22px 26px 80px;
+  background:linear-gradient(180deg,rgba(0,0,0,.8),transparent);
+  display:flex;align-items:flex-start;justify-content:space-between;
+}
+.uht-name{font-family:var(--font-display);font-size:clamp(.78rem,2.5vw,1.2rem);color:#e8f0ff;letter-spacing:.05em;}
+.uht-meta{font-size:.4rem;letter-spacing:.2em;color:rgba(180,150,65,.4);text-transform:uppercase;margin-top:3px;}
+.uht-controls{pointer-events:all;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.uht-btn{padding:7px 18px;background:rgba(0,0,0,.65);border:1px solid rgba(200,162,50,.2);border-radius:3px;font-family:var(--font-mono);font-size:.44rem;letter-spacing:.15em;color:rgba(200,170,88,.5);cursor:pointer;text-transform:uppercase;transition:all .2s;text-align:center;}
+.uht-btn:hover{border-color:var(--gold);color:var(--gold);}
+.uht-hints{font-size:.36rem;letter-spacing:.1em;color:rgba(155,130,65,.28);text-transform:uppercase;line-height:1.9;text-align:right;}
+
+#udj-xhair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+#udj-xhair::before,#udj-xhair::after{content:'';position:absolute;background:rgba(240,200,74,.42);}
+#udj-xhair::before{width:16px;height:1px;top:0;left:-8px;}
+#udj-xhair::after{width:1px;height:16px;top:-8px;left:0;}
+
+#udj-hud-bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:80px 26px 20px;
+  background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);
+  display:flex;align-items:flex-end;justify-content:space-between;
+}
+.uhb-left{font-size:.36rem;letter-spacing:.16em;color:rgba(148,125,62,.28);text-transform:uppercase;}
+.uhb-right{display:flex;align-items:center;gap:10px;}
+#udj-audio-visualiser{display:flex;align-items:flex-end;gap:2px;height:20px;pointer-events:all;cursor:pointer;opacity:.5;}
+.uav-bar{width:3px;background:var(--gold);border-radius:1px;min-height:2px;transition:height .05s ease;}
+#udj-vr-btn{pointer-events:all;padding:5px 13px;background:rgba(0,0,0,.55);border:1px solid rgba(200,162,50,.16);border-radius:2px;font-family:var(--font-mono);font-size:.38rem;letter-spacing:.13em;color:rgba(175,150,72,.38);cursor:pointer;text-transform:uppercase;transition:all .2s;}
+#udj-vr-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+/* Transition overlay */
+#udj-transition{position:fixed;inset:0;z-index:8006;background:#000;opacity:0;pointer-events:none;transition:opacity .55s;}
+#udj-transition.in{opacity:1;}
+
+/* Club loading */
+#udj-loading{position:absolute;inset:0;z-index:8020;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000;transition:opacity .5s;}
+#udj-loading.out{opacity:0;pointer-events:none;}
+.udj-ld-name{font-family:var(--font-display);font-size:clamp(.9rem,3vw,1.5rem);color:#e8f0ff;margin-bottom:5px;text-align:center;padding:0 20px;}
+.udj-ld-loc{font-size:.4rem;letter-spacing:.24em;color:rgba(178,148,65,.35);text-transform:uppercase;margin-bottom:20px;}
+#udj-ld-bar{width:240px;height:1px;background:rgba(200,162,50,.1);margin-bottom:9px;}
+#udj-ld-prog{height:100%;background:linear-gradient(90deg,rgba(200,162,50,.28),var(--gold));width:0%;transition:width .25s;}
+.udj-ld-status{font-size:.38rem;letter-spacing:.18em;color:rgba(152,125,48,.3);text-transform:uppercase;}
+
+/* Enter prompt */
+#udj-enter-prompt{position:absolute;inset:0;z-index:8015;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);cursor:pointer;transition:opacity .4s;}
+#udj-enter-prompt.out{opacity:0;pointer-events:none;}
+.uep-name{font-family:var(--font-display);font-size:clamp(.9rem,3.5vw,1.9rem);color:#e8f0ff;margin-bottom:10px;text-align:center;padding:0 22px;}
+.uep-hint{font-size:.44rem;letter-spacing:.2em;color:rgba(180,150,65,.4);text-transform:uppercase;}
+
+/* Sony Demo Overlay */
+#udj-demo{position:absolute;inset:0;z-index:8008;pointer-events:none;transition:opacity .6s;}
+#udj-demo.out{opacity:0;}
+#udj-demo-top{
+  position:absolute;top:0;left:0;right:0;
+  padding:28px 38px 100px;
+  background:linear-gradient(180deg,rgba(0,0,0,.85),transparent);
+}
+.udt-brand{font-family:var(--font-mono);font-size:.48rem;letter-spacing:.42em;color:rgba(240,200,74,.42);text-transform:uppercase;margin-bottom:5px;}
+.udt-tagline{font-family:var(--font-body);font-style:italic;font-size:.82rem;color:rgba(200,180,110,.28);font-weight:300;}
+.udt-counter{position:absolute;top:28px;right:38px;text-align:right;}
+.udt-num{font-family:var(--font-display);font-size:clamp(2rem,5vw,3.5rem);color:rgba(240,200,74,.16);line-height:1;}
+.udt-label{font-size:.36rem;letter-spacing:.28em;color:rgba(180,152,65,.25);text-transform:uppercase;margin-top:4px;}
+#udj-demo-centre{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;padding:0 38px;}
+.udc-num{font-family:var(--font-mono);font-size:.5rem;letter-spacing:.42em;color:rgba(240,200,74,.35);text-transform:uppercase;margin-bottom:12px;}
+.udc-name{font-family:var(--font-display);font-size:clamp(1.6rem,5vw,4.2rem);color:#e8f0ff;line-height:1.06;letter-spacing:.04em;text-shadow:0 0 70px rgba(200,180,255,.22);}
+.udc-loc{font-family:var(--font-body);font-style:italic;font-size:clamp(.75rem,2vw,1.05rem);color:rgba(200,172,108,.35);margin-top:8px;font-weight:300;}
+.udc-tier{display:inline-block;margin-top:16px;padding:4px 15px;border:1px solid rgba(240,200,74,.2);border-radius:2px;font-family:var(--font-mono);font-size:.44rem;letter-spacing:.24em;color:rgba(240,200,74,.42);text-transform:uppercase;}
+#udj-demo-bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:100px 38px 28px;
+  background:linear-gradient(0deg,rgba(0,0,0,.85),transparent);
+  display:flex;align-items:flex-end;justify-content:space-between;
+}
+.udb-stats{display:flex;gap:28px;}
+.udb-stat-v{font-family:var(--font-mono);font-size:clamp(.68rem,2vw,1rem);color:rgba(240,200,74,.5);display:block;}
+.udb-stat-l{font-size:.32rem;letter-spacing:.18em;color:rgba(155,130,62,.32);text-transform:uppercase;margin-top:2px;}
+.udb-hint{font-size:.38rem;letter-spacing:.14em;color:rgba(155,130,62,.28);text-transform:uppercase;line-height:2;text-align:right;}
+#udj-demo-prog{position:absolute;bottom:0;left:0;right:0;height:1px;background:rgba(240,200,74,.07);}
+#udj-demo-prog-fill{height:100%;background:linear-gradient(90deg,rgba(200,160,50,.28),var(--gold));width:0%;}
+#udj-demo-interact{position:absolute;bottom:100px;left:0;right:0;text-align:center;font-family:var(--font-mono);font-size:.44rem;letter-spacing:.24em;color:rgba(200,172,100,.25);text-transform:uppercase;animation:ph 3s ease-in-out infinite;}
+@keyframes ph{0%,100%{opacity:.28;}50%{opacity:.55;}}
+
+/* Grain + scrollbar */
+body::after{content:'';position:fixed;inset:-50%;width:200%;height:200%;pointer-events:none;z-index:9999;opacity:.16;animation:grain 7s steps(9) infinite;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");}
+@keyframes grain{0%,100%{transform:translate(0,0);}12%{transform:translate(-2%,3%);}25%{transform:translate(3%,-2%);}37%{transform:translate(-1%,-3%);}50%{transform:translate(2%,1%);}62%{transform:translate(-3%,2%);}75%{transform:translate(1%,-1%);}87%{transform:translate(2%,3%);}};
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:rgba(200,162,50,.2);}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════
+     MAIN GAME WRAPPER
+     In your real file this wraps all existing screens
+     ════════════════════════════════════════════════ -->
+<div id="gameWrapper">
+
+  <!-- Club Screen (existing) -->
+  <div id="clubScreen" class="game-screen active">
+    <div class="screen-header">
+      <div class="sh-eyebrow">Universal DJ Multi-Verse · Venue Compendium</div>
+      <div class="sh-title">The World Stage</div>
+      <p class="sh-sub">100 venues. Every continent. One empire. Click ⟶ Enter Club to step inside.</p>
+      <div class="filter-bar">
+        <button class="fb active" onclick="Game.filter('all')">All Venues</button>
+        <button class="fb" onclick="Game.filter('legendary')">Legendary</button>
+        <button class="fb" onclick="Game.filter('apex')">Apex</button>
+        <button class="fb" onclick="Game.filter('elite')">Elite</button>
+      </div>
+    </div>
+    <div class="club-grid" id="clubGrid"></div>
+  </div>
+
+</div><!-- /gameWrapper -->
+
+<!-- ════════════════════════════════════════════════
+     3D IMMERSIVE OVERLAY
+     Paste this block into your main game <body>
+     ════════════════════════════════════════════════ -->
+<div id="udj-3d-overlay">
+  <canvas id="udj-3d-canvas"></canvas>
+
+  <!-- Beat flash -->
+  <div id="udj-beat-flash"></div>
+
+  <!-- Sony demo overlay -->
+  <div id="udj-demo">
+    <div id="udj-demo-top">
+      <div><div class="udt-brand">Universal DJ Multi-Verse · The Architect Edition</div><div class="udt-tagline">A $50,000,000 interactive universe — 100 venues · infinite play</div></div>
+      <div class="udt-counter"><div class="udt-num" id="demo-count">100</div><div class="udt-label">Immersive Venues</div></div>
+    </div>
+    <div id="udj-demo-centre">
+      <div class="udc-num" id="demo-num">—</div>
+      <div class="udc-name" id="demo-name">—</div>
+      <div class="udc-loc" id="demo-loc">—</div>
+      <div class="udc-tier" id="demo-tier">—</div>
+    </div>
+    <div id="udj-demo-bottom">
+      <div class="udb-stats">
+        <div><span class="udb-stat-v" id="demo-cap">—</span><span class="udb-stat-l">Capacity</span></div>
+        <div><span class="udb-stat-v" id="demo-rev">—</span><span class="udb-stat-l">Rev / Show</span></div>
+        <div><span class="udb-stat-v">WebGL</span><span class="udb-stat-l">Engine</span></div>
+        <div><span class="udb-stat-v">360°</span><span class="udb-stat-l">Immersive</span></div>
+        <div><span class="udb-stat-v">WebXR</span><span class="udb-stat-l">VR Ready</span></div>
+      </div>
+      <div class="udb-hint">Click anywhere to explore<br>[ESC] Return to demo</div>
+    </div>
+    <div id="udj-demo-interact">Click or press any key to take control</div>
+    <div id="udj-demo-prog"><div id="udj-demo-prog-fill"></div></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="udj-hud">
+    <div id="udj-hud-top">
+      <div><div class="uht-name" id="udj-club-name">—</div><div class="uht-meta" id="udj-club-meta">—</div></div>
+      <div class="uht-controls">
+        <button class="uht-btn" id="udj-btn-exit" onclick="UDJ3D.exit()">← Exit Club</button>
+        <button class="uht-btn" id="udj-btn-demo" onclick="UDJ3D.Demo.resume()">⊟ Demo Mode</button>
+        <button class="uht-btn" id="udj-btn-next" onclick="UDJ3D.Demo.next()">Next Club →</button>
+        <div class="uht-hints">Drag · Touch to look<br>Gyroscope · [ESC] exit</div>
+      </div>
+    </div>
+    <div id="udj-xhair"></div>
+    <div id="udj-hud-bottom">
+      <div class="uhb-left">UDJ MULTI-VERSE · IMMERSIVE ENGINE v3</div>
+      <div class="uhb-right">
+        <div id="udj-audio-visualiser"></div>
+        <button id="udj-vr-btn" onclick="UDJ3D.VR.enter()">⊞ VR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transition -->
+  <div id="udj-transition"></div>
+
+  <!-- Loading -->
+  <div id="udj-loading">
+    <div class="udj-ld-name" id="udj-ld-name">—</div>
+    <div class="udj-ld-loc" id="udj-ld-loc">—</div>
+    <div id="udj-ld-bar"><div id="udj-ld-prog"></div></div>
+    <div class="udj-ld-status" id="udj-ld-status">Initialising…</div>
+  </div>
+
+  <!-- Enter prompt -->
+  <div id="udj-enter-prompt" class="out">
+    <div class="uep-name" id="udj-ep-name">—</div>
+    <div class="uep-hint">Click · tap anywhere · drag to look around</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="gameToast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   UNIVERSAL DJ MULTI-VERSE
+   Complete Single-File Architecture
+   ═══════════════════════════════════════════════════════════════ */
+
+const SK='udj_v3', CK='udj_clubs_v1';
+function gs(){try{return JSON.parse(localStorage.getItem(SK)||'{}')}catch(e){return{}}}
+function cs(){try{return JSON.parse(localStorage.getItem(CK)||'{}')}catch(e){return{}}}
+function gl(){const s=gs();return s.level||1;}
+function gc(){const s=gs();return s.cash||s.money||0;}
+function dc(a){try{const s=gs();const k='cash' in s?'cash':'money';s[k]=Math.max(0,(s[k]||0)-a);localStorage.setItem(SK,JSON.stringify(s));}catch(e){}}
+function ac(a){try{const s=gs();const k='cash' in s?'cash':'money';s[k]=(s[k]||0)+a;localStorage.setItem(SK,JSON.stringify(s));}catch(e){}}
+
+/* ── TOAST ── */
+function toast(msg){
+  const t=document.getElementById('gameToast');
+  t.textContent=msg;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(18px)';},3000);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CLUB REGISTRY — All 100 Venues
+   ═══════════════════════════════════════════════════════════════ */
+const REGISTRY=[
+  /* The first 9 — fully hand-crafted environments */
+  {id:'crystal_cathedral',name:'The Crystal Cathedral',tagline:'Twelve thousand souls beneath vaulted crystal ceilings that refract every laser into cathedral light.',loc:'Los Angeles, CA',tier:'Legendary',prestige:5,cap:12000,book:25000,rev:180000,unlock:15,rgb:'200,170,255',accent:'rgba(200,170,255,.9)',accentDim:'rgba(160,130,220,.32)',glow:'rgba(180,140,255,.12)',bg:'rgba(4,2,14,.98)',border:'rgba(160,130,240,.14)',borderH:'rgba(200,160,255,.38)',special:{i:'💎',t:'<strong>Crystal Resonance:</strong> Permanently unlocks Crystal Tier clone variant. +25% all venue bookings.'}},
+  {id:'temple_osiris',name:'Temple of Osiris',tagline:'Obsidian floors inlaid with gold hieroglyphs. Columns of amber-lit stone rising forty feet.',loc:'Dubai, UAE',tier:'Apex',prestige:5,cap:6000,book:18000,rev:120000,unlock:12,rgb:'240,180,40',accent:'rgba(240,180,40,.9)',accentDim:'rgba(200,140,20,.32)',glow:'rgba(240,180,40,.12)',bg:'rgba(8,5,0,.98)',border:'rgba(200,150,28,.14)',borderH:'rgba(240,200,58,.38)',special:{i:'🏺',t:'<strong>Ancient Resonance:</strong> Unlocks Pharaoh Prestige Title. Doubles fan acquisition across MENA.'}},
+  {id:'celestial_spire',name:'The Celestial Spire',tagline:'A glass tower club piercing the Tokyo skyline. The dance floor hangs over forty-two floors of light.',loc:'Tokyo, Japan',tier:'Elite',prestige:4,cap:4000,book:15000,rev:95000,unlock:10,rgb:'100,210,255',accent:'rgba(100,210,255,.9)',accentDim:'rgba(60,170,220,.32)',glow:'rgba(80,200,255,.12)',bg:'rgba(0,5,14,.98)',border:'rgba(60,170,240,.14)',borderH:'rgba(100,210,255,.38)',special:{i:'🌃',t:'<strong>City Above:</strong> +40% streaming revenue for all broadcasts. Unlocks Tokyo Residency.'}},
+  {id:'obsidian_vault',name:'The Obsidian Vault',tagline:'Carved from raw obsidian forty metres below street level. No windows. No daylight. No compromise.',loc:'Berlin, Germany',tier:'Elite',prestige:4,cap:2000,book:8000,rev:55000,unlock:8,rgb:'160,100,255',accent:'rgba(160,100,255,.9)',accentDim:'rgba(120,60,220,.32)',glow:'rgba(140,80,255,.12)',bg:'rgba(3,0,8,.99)',border:'rgba(120,60,220,.14)',borderH:'rgba(160,100,255,.38)',special:{i:'🔊',t:'<strong>Deep Cut:</strong> +60% underground fan multiplier. Unlocks Berlin School genre fusion.'}},
+  {id:'amber_palace',name:'The Amber Palace',tagline:'A thousand hand-blown glass lanterns casting warm fire across 3,500 bodies. Pure luxury.',loc:'Marrakech, Morocco',tier:'Elite',prestige:4,cap:3500,book:12000,rev:78000,unlock:9,rgb:'255,160,40',accent:'rgba(255,160,40,.9)',accentDim:'rgba(220,120,18,.32)',glow:'rgba(255,150,28,.12)',bg:'rgba(10,4,0,.98)',border:'rgba(220,130,18,.14)',borderH:'rgba(255,170,48,.38)',special:{i:'🏮',t:'<strong>Lantern Network:</strong> +50% VIP revenue. Unlocks the Amber Clone tier.'}},
+  {id:'nova_sanctum',name:'Nova Sanctum',tagline:'Fifteen thousand people. Holographic stage extensions reaching sixty metres. Seoul at maximum.',loc:'Seoul, South Korea',tier:'Legendary',prestige:5,cap:15000,book:30000,rev:220000,unlock:18,rgb:'100,240,220',accent:'rgba(100,240,220,.9)',accentDim:'rgba(60,200,180,.32)',glow:'rgba(80,230,210,.12)',bg:'rgba(0,6,8,.98)',border:'rgba(50,200,180,.14)',borderH:'rgba(100,240,220,.38)',special:{i:'🚀',t:'<strong>Holographic Broadcast:</strong> Auto-streams to 2M+ viewers. +300% fan acquisition.'}},
+  {id:'absinthe_garden',name:'The Absinthe Garden',tagline:'Dripping Art Nouveau ironwork. A thousand fairy lights woven through living vines. Absinthe fountains.',loc:'Paris, France',tier:'Elite',prestige:4,cap:1800,book:9000,rev:60000,unlock:8,rgb:'80,210,100',accent:'rgba(80,210,100,.9)',accentDim:'rgba(40,175,62,.32)',glow:'rgba(60,200,80,.12)',bg:'rgba(0,8,2,.98)',border:'rgba(35,165,58,.14)',borderH:'rgba(80,210,100,.38)',special:{i:'🍃',t:'<strong>Green Fairy Circuit:</strong> Global cultural press. +40% reputation per show.'}},
+  {id:'black_mirror',name:'The Black Mirror',tagline:'Six mirrored walls. Manhattan reflected infinitely. Digital rain of binary code.',loc:'New York, NY',tier:'Elite',prestige:3,cap:3000,book:10000,rev:65000,unlock:9,rgb:'100,180,255',accent:'rgba(100,180,255,.9)',accentDim:'rgba(60,148,225,.32)',glow:'rgba(80,165,248,.12)',bg:'rgba(0,3,8,.99)',border:'rgba(55,140,218,.14)',borderH:'rgba(100,180,255,.38)',special:{i:'🪞',t:'<strong>Infinite Reflection:</strong> +200% organic post reach. Every attendee becomes an influencer.'}},
+  {id:'ivory_temple',name:'The Ivory Temple',tagline:'A converted Victorian concert hall. Grand chandeliers. Organ pipe walls. Seven thousand people.',loc:'London, England',tier:'Apex',prestige:5,cap:7500,book:20000,rev:135000,unlock:13,rgb:'230,200,120',accent:'rgba(230,200,120,.88)',accentDim:'rgba(195,165,82,.28)',glow:'rgba(225,195,112,.1)',bg:'rgba(6,4,1,.98)',border:'rgba(190,160,78,.13)',borderH:'rgba(232,202,120,.33)',special:{i:'🎼',t:'<strong>Royal Circuit:</strong> BAFTA, Buckingham, Glastonbury scouts attend. Highest rep gain.'}},
+  /* Clubs 10-100 — generated from bulk data */
+  ...buildBulkClubs()
+];
+
+function buildBulkClubs(){
+  const data=[
+    ['prism','Prism','Ibiza, Spain','Apex',4,38000,100000,280000,10,'220,80,220'],
+    ['biolumin','Bioluminescent Grotto','Miami, FL','Apex',4,12000,88000,0,11,'0,220,190'],
+    ['sanctum_noir','Sanctum Noir','New Orleans, LA','Elite',3,8500,55000,0,9,'160,60,220'],
+    ['copper_foundry','Copper Foundry','Manchester, UK','Elite',3,9000,58000,0,9,'220,105,30'],
+    ['zenith','Zenith','Nevada Desert','Apex',5,20000,125000,8000,13,'255,215,45'],
+    ['sapphire_mosque','Sapphire Mosque','Istanbul, Turkey','Legendary',5,18000,110000,6000,14,'40,115,255'],
+    ['neon_pagoda','Neon Pagoda','Osaka, Japan','Apex',4,14000,90000,0,11,'255,30,95'],
+    ['onyx_colosseum','Onyx Colosseum','Rome, Italy','Legendary',5,22000,155000,8000,16,'30,20,70'],
+    ['arctic_lens','Arctic Lens','Reykjavik, Iceland','Apex',4,10000,72000,0,12,'105,215,240'],
+    ['red_lotus','Red Lotus','Shanghai, China','Apex',4,16000,100000,0,13,'255,25,40'],
+    ['infinity_rift','Infinity Rift','Singapore','Legendary',5,20000,145000,8000,15,'35,220,200'],
+    ['obsidian_reef','Obsidian Reef','Maldives','Apex',4,8000,96000,0,12,'0,148,205'],
+    ['gilded_serpent','Gilded Serpent','Chicago, IL','Elite',3,9500,62000,0,9,'240,172,30'],
+    ['valhalla','Valhalla','Oslo, Norway','Apex',4,12000,80000,0,11,'62,112,215'],
+    ['silk_road','Silk Road','Samarkand','Apex',4,10000,75000,0,11,'202,130,35'],
+    ['chromosphere','Chromosphere','Mexico City','Apex',4,14000,88000,0,12,'255,132,12'],
+    ['jade_pavilion','Jade Pavilion','Beijing, China','Apex',4,12000,78000,0,11,'55,195,105'],
+    ['phantom_opera','Phantom Opera','Vienna, Austria','Legendary',5,15000,102000,6000,13,'112,45,182'],
+    ['supernova','Supernova','Cape Canaveral','Apex',4,10000,70000,0,12,'38,138,255'],
+    ['lava_cathedral','Lava Cathedral','Hawaii','Legendary',5,12000,88000,6000,14,'255,62,0'],
+    ['mirror_palace','Mirror Palace','Versailles','Legendary',5,14000,100000,6000,14,'228,208,108'],
+    ['diamond_mine','Diamond Mine','Johannesburg','Legendary',5,11000,115000,7000,14,'220,240,255'],
+    ['hanging_gardens','Hanging Gardens','Beirut, Lebanon','Apex',4,13000,88000,0,11,'105,208,88'],
+    ['catacombs','The Catacombs','Paris (Underground)','Elite',4,7000,52000,0,9,'198,172,115'],
+    ['glass_pyramid','Glass Pyramid','Cairo, Egypt','Legendary',5,18000,160000,8000,15,'255,205,55'],
+    ['elysium','Elysium','Mount Olympus','Legendary',5,20000,172000,8000,16,'180,205,255'],
+    ['black_taj','The Black Taj','Agra, India','Legendary',5,16000,150000,7000,14,'155,112,255'],
+    ['burning_library','Burning Library','Alexandria','Apex',4,11000,94000,0,12,'255,130,30'],
+    ['silver_glacier','Silver Glacier','Swiss Alps','Apex',4,9000,108000,0,12,'188,220,238'],
+    ['thunder_palace','Thunder Palace','Detroit, MI','Elite',3,15000,68000,0,9,'255,140,0'],
+    ['deep_current','The Deep Current','Mariana Trench','Legendary',5,3000,600000,8000,20,'0,138,180'],
+    ['neon_ziggurat','Neon Ziggurat','Baghdad, Iraq','Apex',4,12000,98000,0,12,'255,100,38'],
+    ['crystal_cenote','Crystal Cenote','Yucatan, Mexico','Apex',5,10000,96000,0,11,'20,205,230'],
+    ['iron_cathedral','Iron Cathedral','Pittsburgh, PA','Elite',3,12000,62000,0,9,'80,140,200'],
+    ['blood_moon','Blood Moon','São Paulo, Brazil','Apex',4,30000,140000,0,13,'212,30,55'],
+    ['floating_lantern','Floating Lantern','Bangkok, Thailand','Apex',4,14000,97000,0,11,'255,180,40'],
+    ['bone_church','Bone Church','Prague, Czech Rep','Elite',4,7000,58000,0,9,'208,190,155'],
+    ['oracle_chamber','Oracle Chamber','Delphi, Greece','Apex',5,10000,102000,0,12,'138,220,105'],
+    ['tundra_fortress','Tundra Fortress','Norilsk, Siberia','Elite',3,9000,72000,0,10,'145,180,220'],
+    ['cloud_temple','Cloud Temple','Machu Picchu','Legendary',5,12000,132000,7000,14,'180,205,255'],
+    ['the_nexus','The Nexus','Las Vegas, NV','NEXUS',5,50000,1000000,0,25,'190,145,255'],
+    ['jade_labyrinth','Jade Labyrinth','Taipei, Taiwan','Apex',4,10000,86000,0,11,'45,180,138'],
+    ['amber_cavern','Amber Cavern','Gdańsk, Poland','Apex',4,9000,84000,0,11,'230,162,38'],
+    ['storm_deck','Storm Deck','Madagascar','Legendary',5,12000,138000,7000,14,'88,165,255'],
+    ['the_colossus','The Colossus','Three Gorges, China','Legendary',5,22000,185000,8000,16,'62,145,220'],
+    ['scarlet_pagoda','Scarlet Pagoda','Kyoto, Japan','Apex',5,12000,108000,0,12,'205,20,45'],
+    ['salt_cathedral','Salt Cathedral','Zipaquirá, Colombia','Apex',5,14000,100000,0,12,'205,220,238'],
+    ['roman_thermae','Roman Thermae','Bath, England','Apex',4,12000,96000,0,11,'155,195,120'],
+    ['iron_lotus','Iron Lotus','Nairobi, Kenya','Apex',4,16000,110000,0,12,'55,200,88'],
+    ['phantom_quarter','Phantom Quarter','Montréal, Canada','Elite',4,12000,74000,0,10,'145,62,220'],
+    ['eternal_flame','Eternal Flame','Baku, Azerbaijan','Legendary',5,14000,124000,7000,13,'12,205,180'],
+    ['thunderhead','Thunderhead','Oklahoma, USA','Apex',4,16000,112000,0,12,'162,195,255'],
+    ['floating_garden','Floating Garden','Kashmir, India','Apex',5,10000,94000,0,12,'180,112,220'],
+    ['pearl_diver','Pearl Diver','Bahrain','Apex',4,8000,104000,0,12,'220,215,255'],
+    ['cathedral_ice','Cathedral of Ice','Greenland','Legendary',5,8000,148000,8000,14,'155,220,255'],
+    ['dust_temple','Dust Temple','Black Rock Desert','Legendary',5,20000,250000,0,15,'255,145,30'],
+    ['chrome_forest','Chrome Forest','Toronto, Canada','Apex',4,18000,118000,0,13,'162,195,220'],
+    ['sunken_temple','Sunken Temple','Varanasi, India','Legendary',5,15000,108000,7000,13,'255,170,30'],
+    ['moongate','The Moongate','Bermuda','Apex',4,8000,106000,0,12,'180,220,255'],
+    ['iron_sanctum','Iron Sanctum','Melbourne, Australia','Elite',4,14000,76000,0,10,'255,62,105'],
+    ['philosophers_gate',"Philosopher's Gate",'Athens, Greece','Legendary',5,18000,132000,7000,14,'220,195,130'],
+    ['coral_throne','Coral Throne','Great Barrier Reef','Legendary',5,14000,138000,7000,14,'0,205,180'],
+    ['midnight_sun','Midnight Sun','Tromsø, Norway','Apex',5,18000,116000,0,13,'255,200,62'],
+    ['obsidian_river','Obsidian River','Amazon Basin','Apex',4,18000,100000,0,12,'30,180,62'],
+    ['jade_dragon','Jade Dragon Mountain','Lijiang, China','Apex',5,14000,104000,0,12,'105,215,180'],
+    ['copper_canyon','Copper Canyon','Barrancas del Cobre','Apex',4,22000,106000,0,12,'205,105,30'],
+    ['skeleton_coast','Skeleton Coast','Namibia','Apex',4,5000,118000,0,12,'212,195,155'],
+    ['sea_organ','Sea Organ','Zadar, Croatia','Apex',4,12000,90000,0,11,'80,162,238'],
+    ['painted_desert','Painted Desert','Monument Valley','Legendary',5,30000,150000,8000,14,'220,95,30'],
+    ['magnetic_anomaly','Magnetic Anomaly','Antarctica','Legendary',5,4000,320000,8000,19,'55,255,165'],
+    ['obsidian_court','Obsidian Court','Cappadocia, Turkey','Legendary',5,16000,122000,7000,13,'205,155,88'],
+    ['glass_volcano','Glass Volcano','Santorini, Greece','Legendary',5,14000,144000,7000,14,'80,162,255'],
+    ['tessellation','Tessellation','Helsinki, Finland','Apex',4,14000,94000,0,11,'155,195,238'],
+    ['whale_song','Whale Song','Tonga, Pacific','Legendary',5,6000,148000,8000,14,'0,180,212'],
+    ['grand_salon','Grand Salon','Fez, Morocco','Apex',5,12000,97000,0,12,'220,155,55'],
+    ['kelp_forest','Kelp Forest','Monterey, CA','Apex',4,9000,107000,0,12,'45,180,105'],
+    ['thunder_mesa','Thunder Mesa','Mesa Verde, CO','Apex',4,10000,100000,0,12,'205,130,55'],
+    ['monsoon_palace','Monsoon Palace','Udaipur, India','Legendary',5,16000,114000,7000,13,'145,180,255'],
+    ['clock_tower','Clock Tower','Zurich, Switzerland','Apex',4,10000,100000,0,11,'195,170,105'],
+    ['saffron_road','Saffron Road','Zanzibar','Apex',4,14000,94000,0,11,'255,170,55'],
+    ['the_horizon','The Horizon','International Waters','Legendary',5,24000,200000,8000,16,'80,180,255'],
+    ['amber_fort','Amber Fort','Jaipur, India','Legendary',5,18000,116000,7000,13,'255,162,45'],
+    ['storm_glass','Storm Glass','Cape Town, SA','Apex',4,18000,120000,0,13,'80,188,170'],
+    ['terra_cotta','Terra Cotta',"Xi'an, China",'Legendary',5,18000,136000,7000,14,'195,130,55'],
+    ['white_city','White City','Ashgabat, Turkmenistan','Apex',4,20000,106000,0,12,'205,220,238'],
+    ['standing_stones','Standing Stones','Isle of Lewis, UK','Apex',5,9000,97000,0,12,'145,180,220'],
+    ['neptunes_court',"Neptune's Court",'Azores, Portugal','Apex',4,8000,110000,0,13,'0,162,212'],
+    ['floating_city','Floating City','Lake Titicaca','Apex',4,12000,88000,0,11,'105,170,255'],
+    ['chromatic_falls','Chromatic Falls','Iguazu, Argentina','Legendary',5,22000,144000,8000,14,'55,188,212'],
+    ['neon_bazaar','Neon Bazaar','Jeddah, Saudi Arabia','Apex',5,16000,110000,0,13,'255,155,55'],
+    ['architects_cathedral',"The Architect's Cathedral",'The Multi-Verse','CENTURY',5,100000,0,0,30,'240,200,74'],
+  ];
+  return data.map(([id,name,loc,tier,prestige,cap,rev,book,unlock,rgb])=>({
+    id,name,loc,tier,prestige,cap,rev,book,unlock,rgb,
+    tagline:`${tier} venue · ${loc}`,
+    accent:`rgba(${rgb},.9)`,accentDim:`rgba(${rgb},.28)`,
+    glow:`rgba(${rgb},.1)`,bg:'rgba(3,2,8,.98)',
+    border:`rgba(${rgb},.12)`,borderH:`rgba(${rgb},.35)`,
+    special:{i:'🌐',t:`<strong>${tier} Circuit:</strong> Books ${loc} into your empire. Level ${unlock} required.`}
+  }));
+}
+
+/* ── GAME ENGINE ── */
+const Game={
+  af:'all',
+  render(filter='all'){
+    this.af=filter;
+    const grid=document.getElementById('clubGrid');
+    if(!grid)return;
+    const lv=gl(),state=cs();
+    document.querySelectorAll('.fb').forEach(b=>b.classList.toggle('active',
+      (filter==='all'&&b.textContent==='All Venues')||
+      b.textContent.toLowerCase().includes(filter)
+    ));
+    const clubs=filter==='all'?REGISTRY:REGISTRY.filter(c=>c.tier.toLowerCase()===filter||c.tier.toLowerCase().includes(filter));
+    grid.innerHTML='';
+    clubs.forEach((club,idx)=>{
+      const owned=!!(state[club.id]?.owned);
+      const locked=lv<(club.unlock||1)&&!owned;
+      const booked=!!(state[club.id]?.booked);
+      const card=document.createElement('div');
+      card.className='club-card';
+      card.style.cssText=`--card-bg:${club.bg};--card-border:${club.border};--card-border-hover:${club.borderH};--card-accent:${club.accent};--card-accent-dim:${club.accentDim};--card-glow:${club.glow};--card-rgb:${club.rgb};animation-delay:${(idx%20)*.05}s;`;
+      const stars=Array.from({length:5},(_,i)=>`<span class="prestige-star">${i<(club.prestige||3)?'★':'☆'}</span>`).join('');
+      const sid='stage_'+club.id;
+      const cap=club.cap>=1000?(club.cap/1000).toFixed(0)+'K':club.cap;
+      const rev=club.rev>=1000?(club.rev/1000000)>=1?(club.rev/1000000).toFixed(1)+'M':(club.rev/1000).toFixed(0)+'K':club.rev;
+      const book=club.book>=1000?(club.book/1000).toFixed(0)+'K':club.book;
+      card.innerHTML=`
+<div class="club-stage">
+  <canvas id="${sid}" width="380" height="200"></canvas>
+  <div class="club-tier-badge">${club.tier}</div>
+  <div class="club-prestige">${stars}</div>
+  ${owned?`<span style="position:absolute;bottom:12px;left:12px;z-index:2;padding:2px 9px;background:rgba(0,180,80,.18);border:1px solid rgba(0,200,80,.32);border-radius:2px;font-family:var(--font-mono);font-size:.44rem;letter-spacing:.12em;color:rgba(80,220,120,.9);">✓ OWNED</span>`:''}
+</div>
+<div class="club-body">
+  <div class="club-location">📍 ${club.loc}</div>
+  <div class="club-name">${club.name}</div>
+  <div class="club-tagline">${club.tagline||''}</div>
+  <div class="club-divider"></div>
+  <div class="club-stats">
+    <div class="club-stat"><span class="cs-val">${cap}</span><span class="cs-lbl">Capacity</span></div>
+    <div class="club-stat"><span class="cs-val">$${book}</span><span class="cs-lbl">Booking</span></div>
+    <div class="club-stat"><span class="cs-val">$${rev}</span><span class="cs-lbl">Revenue</span></div>
+    <div class="club-stat"><span class="cs-val">Lvl ${club.unlock||1}</span><span class="cs-lbl">Unlock</span></div>
+  </div>
+  <div class="club-special"><span class="cs-icon">${club.special.i}</span><span class="cs-text">${club.special.t}</span></div>
+  <div class="club-actions">
+    <button class="club-btn cb-book" onclick="Game.book('${club.id}')" ${locked||booked?'disabled':''}>${booked?'✓ Booked':'Book Night'}</button>
+    <button class="club-btn cb-own"  onclick="Game.acquire('${club.id}')" ${locked||owned?'disabled':''}>${owned?'✓ Owned':'Acquire'}</button>
+    <button class="club-btn cb-perform" onclick="Game.perform('${club.id}')" ${locked||!owned?'disabled':''}>Perform</button>
+  </div>
+  <!-- ★ THE INTEGRATION BUTTON — paste this into your existing card template ★ -->
+  <button class="cb-enter-3d" onclick="UDJ3D.enter('${club.id}',${idx})" ${locked?'disabled':''}>
+    <span class="enter-icon">⟶</span> Enter Club
+  </button>
+</div>
+${locked?`<div class="club-locked"><div class="lock-icon">🔒</div><div class="lock-text">Level ${club.unlock||1} required</div></div>`:''}`;
+      grid.appendChild(card);
+      // Render 2D preview
+      requestAnimationFrame(()=>{
+        const cv=document.getElementById(sid);if(!cv)return;
+        const ctx=cv.getContext('2d');const w=cv.width,h=cv.height;
+        const [r,g,b]=club.rgb.split(',').map(Number);
+        const bg2=ctx.createLinearGradient(0,0,0,h);
+        bg2.addColorStop(0,`rgb(${Math.round(r*.14)},${Math.round(g*.14)},${Math.round(b*.14)})`);
+        bg2.addColorStop(1,'rgb(2,1,5)');
+        ctx.fillStyle=bg2;ctx.fillRect(0,0,w,h);
+        const gl2=ctx.createRadialGradient(w/2,h*.38,0,w/2,h*.38,w*.42);
+        gl2.addColorStop(0,`rgba(${r},${g},${b},0.25)`);gl2.addColorStop(1,'transparent');
+        ctx.fillStyle=gl2;ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle=`rgba(${r},${g},${b},0.16)`;ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(w/2,h*.88,w*.4,Math.PI,0);ctx.stroke();
+        ctx.beginPath();ctx.arc(w/2,h*.88,w*.25,Math.PI,0);ctx.stroke();
+        for(let j=0;j<30;j++){
+          ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h*.78,Math.random()*1.8+.3,0,Math.PI*2);
+          ctx.fillStyle=`rgba(${r},${g},${b},${Math.random()*.22+.05})`;ctx.fill();
+        }
+      });
+    });
+  },
+  filter(f){this.render(f);},
+  book(id){
+    const c=REGISTRY.find(x=>x.id===id);if(!c)return;
+    if(gc()<c.book){toast(`⚠ Need $${c.book.toLocaleString()}`);return;}
+    const s=cs();dc(c.book);s[id]={...(s[id]||{}),booked:true};localStorage.setItem(CK,JSON.stringify(s));
+    toast(`✅ ${c.name} booked`);this.render(this.af);
+  },
+  acquire(id){
+    const c=REGISTRY.find(x=>x.id===id);if(!c)return;
+    const cost=c.rev*8;
+    if(gc()<cost){toast(`⚠ Acquisition cost: $${cost.toLocaleString()}`);return;}
+    if(!confirm(`Acquire ${c.name} for $${cost.toLocaleString()}?`))return;
+    const s=cs();dc(cost);s[id]={...(s[id]||{}),owned:true,booked:true};localStorage.setItem(CK,JSON.stringify(s));
+    toast(`🏛️ ${c.name} is yours`);this.render(this.af);
+  },
+  perform(id){
+    const c=REGISTRY.find(x=>x.id===id);if(!c)return;
+    const r=Math.round(c.rev*(.88+Math.random()*.28));ac(r);
+    toast(`🎧 Performed at ${c.name} — +$${r.toLocaleString()}`);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   UDJ3D — IMMERSIVE ENGINE (complete, integrates into main game)
+   ═══════════════════════════════════════════════════════════════ */
+const UDJ3D = (() => {
+  let THREE, renderer, camera, clock;
+  let scene, lights=[], particles=[], specials=[], crowd_pts;
+  let bloomRT, blurH, blurV, brightM, blurHM, blurVM, compositeM;
+  let fullQuad, quadScene, quadCam;
+  let W=0, H=0, raf, running=false;
+
+  const VS=`varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.0);}`;
+  const FS_BRIGHT=`uniform sampler2D t;uniform float th;varying vec2 vUv;void main(){vec4 c=texture2D(t,vUv);float b=dot(c.rgb,vec3(.2126,.7152,.0722));gl_FragColor=vec4(c.rgb*smoothstep(th,th+.15,b),1.);}`;
+  const FS_BH=`uniform sampler2D t;uniform vec2 r;varying vec2 vUv;void main(){vec4 c=vec4(0.);float w[9]=float[](.0044,.054,.242,.3989,.242,.054,.0044,.0044,.0044);float o[9]=float[](-4.,-3.,-2.,-1.,0.,1.,2.,3.,4.);for(int i=0;i<9;i++)c+=texture2D(t,vUv+vec2(o[i]*r.x,0.))*w[i];gl_FragColor=c;}`;
+  const FS_BV=`uniform sampler2D t;uniform vec2 r;varying vec2 vUv;void main(){vec4 c=vec4(0.);float w[9]=float[](.0044,.054,.242,.3989,.242,.054,.0044,.0044,.0044);float o[9]=float[](-4.,-3.,-2.,-1.,0.,1.,2.,3.,4.);for(int i=0;i<9;i++)c+=texture2D(t,vUv+vec2(0.,o[i]*r.y))*w[i];gl_FragColor=c;}`;
+  const FS_COMP=`uniform sampler2D ts;uniform sampler2D tb;uniform float bs;varying vec2 vUv;void main(){vec4 s=texture2D(ts,vUv);vec3 c=s.rgb+texture2D(tb,vUv).rgb*bs;c=(c*(2.51*c+.03))/(c*(2.43*c+.59)+.14);gl_FragColor=vec4(pow(clamp(c,0.,1.),vec3(1./2.2)),1.);}`;
+
+  const look={pitch:0,yaw:0,drag:false,lx:0,ly:0,s:.002,ts:.0026,
+    init(el){
+      el.addEventListener('mousedown',e=>{this.drag=true;this.lx=e.clientX;this.ly=e.clientY;});
+      window.addEventListener('mouseup',()=>{this.drag=false;});
+      window.addEventListener('mousemove',e=>{
+        if(!this.drag||!running)return;
+        this.yaw-=(e.clientX-this.lx)*this.s;this.lx=e.clientX;
+        this.pitch-=(e.clientY-this.ly)*this.s;this.ly=e.clientY;
+        this.pitch=Math.max(-1.36,Math.min(1.36,this.pitch));
+        applyLook();if(Demo.isDemo)Demo.pause();
+      });
+      let tx=0,ty=0;
+      el.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:false});
+      el.addEventListener('touchmove',e=>{
+        if(!running)return;
+        this.yaw-=(e.touches[0].clientX-tx)*this.ts;
+        this.pitch-=(e.touches[0].clientY-ty)*this.ts;
+        this.pitch=Math.max(-1.36,Math.min(1.36,this.pitch));
+        tx=e.touches[0].clientX;ty=e.touches[0].clientY;
+        applyLook();e.preventDefault();if(Demo.isDemo)Demo.pause();
+      },{passive:false});
+      window.addEventListener('deviceorientation',e=>{
+        if(!running||Demo.isDemo||!e.beta)return;
+        look.pitch=Math.max(-1.36,Math.min(1.36,(e.beta-50)*Math.PI/180));
+        look.yaw=-e.alpha*Math.PI/180;applyLook();
+      });
+    }
+  };
+  function applyLook(){if(camera)camera.rotation.set(look.pitch,look.yaw,0,'YXZ');}
+
+  function initGL(){
+    THREE=window.THREE;
+    const cv=document.getElementById('udj-3d-canvas');
+    W=window.innerWidth;H=window.innerHeight;
+    renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,powerPreference:'high-performance'});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer.setSize(W,H);
+    renderer.toneMapping=THREE.NoToneMapping;
+    camera=new THREE.PerspectiveCamera(80,W/H,.05,2000);
+    camera.position.set(0,1.72,0);
+    clock=new THREE.Clock();
+    look.init(cv);
+    window.addEventListener('resize',onResize);
+    initBloom();
+    buildQuadScene();
+    // Click canvas to take control
+    cv.addEventListener('click',()=>{if(Demo.isDemo)Demo.pause();});
+  }
+
+  function onResize(){
+    W=window.innerWidth;H=window.innerHeight;
+    camera.aspect=W/H;camera.updateProjectionMatrix();
+    renderer.setSize(W,H);
+    if(bloomRT){bloomRT.setSize(W,H);blurH.setSize(W/2,H/2);blurV.setSize(W/2,H/2);}
+    if(blurHM)blurHM.uniforms.r.value.set(2/W,0);
+    if(blurVM)blurVM.uniforms.r.value.set(0,2/H);
+  }
+
+  function initBloom(){
+    const o={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat,type:THREE.HalfFloatType};
+    bloomRT=new THREE.WebGLRenderTarget(W,H,o);
+    blurH=new THREE.WebGLRenderTarget(W/2,H/2,o);
+    blurV=new THREE.WebGLRenderTarget(W/2,H/2,o);
+    brightM=new THREE.ShaderMaterial({uniforms:{t:{value:null},th:{value:.42}},vertexShader:VS,fragmentShader:FS_BRIGHT,depthWrite:false});
+    blurHM=new THREE.ShaderMaterial({uniforms:{t:{value:null},r:{value:new THREE.Vector2(2/W,0)}},vertexShader:VS,fragmentShader:FS_BH,depthWrite:false});
+    blurVM=new THREE.ShaderMaterial({uniforms:{t:{value:null},r:{value:new THREE.Vector2(0,2/H)}},vertexShader:VS,fragmentShader:FS_BV,depthWrite:false});
+    compositeM=new THREE.ShaderMaterial({uniforms:{ts:{value:null},tb:{value:null},bs:{value:1.35}},vertexShader:VS,fragmentShader:FS_COMP,depthWrite:false});
+  }
+
+  function buildQuadScene(){
+    quadScene=new THREE.Scene();
+    quadCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([-1,-1,0,3,-1,0,-1,3,0]),3));
+    g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,2,0,0,2]),2));
+    fullQuad=new THREE.Mesh(g,compositeM);fullQuad.frustumCulled=false;
+    quadScene.add(fullQuad);
+  }
+
+  function renderQ(mat,rt){fullQuad.material=mat;renderer.setRenderTarget(rt);renderer.render(quadScene,quadCam);}
+  function renderBloom(){
+    brightM.uniforms.t.value=bloomRT.texture;renderQ(brightM,blurH);
+    blurHM.uniforms.t.value=blurH.texture;renderQ(blurHM,blurV);
+    blurVM.uniforms.t.value=blurV.texture;renderQ(blurVM,blurH);
+    blurHM.uniforms.t.value=blurH.texture;renderQ(blurHM,blurV);
+    compositeM.uniforms.ts.value=bloomRT.texture;
+    compositeM.uniforms.tb.value=blurV.texture;
+    renderer.setRenderTarget(null);renderer.render(quadScene,quadCam);
+  }
+
+  function disposeScene(){
+    if(!scene)return;
+    scene.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());}});
+    while(scene.children.length)scene.remove(scene.children[0]);
+    lights=[];particles=[];specials=[];crowd_pts=null;
+  }
+
+  function buildScene(cfg){
+    disposeScene();
+    scene=new THREE.Scene();
+    const c1=new THREE.Color(...cfg.pal.c1);
+    const c2=new THREE.Color(...cfg.pal.c2);
+    scene.background=new THREE.Color(cfg.pal.bg);
+    scene.fog=new THREE.FogExp2(new THREE.Color(cfg.pal.fog),cfg.pal.fd||.016);
+
+    const R=cfg.arch.R||28,H2=cfg.arch.H||22;
+    const wC=new THREE.Color(cfg.pal.fog).lerp(c1,.22);
+
+    addFloor(R,c1,c2);
+    addArch(cfg.arch.t,R,H2,c1,c2,wC);
+    if(cfg.arch.cols>0)addCols(cfg.arch.cols,R*.76,H2,c1,c2);
+    addStage(R,H2,c1,c2);
+    addLights(R,H2,c1,c2);
+    addBeams(R,H2,c1,c2);
+    addParticles(R,H2,c1,c2);
+    addCrowd(R,c1);
+    if(cfg.stars)addStars(R,H2,c2);
+    if(cfg.city)addCity(R,c1);
+  }
+
+  const M=(g,m,p)=>{const o=new THREE.Mesh(g,m);if(p)Object.entries(p).forEach(([k,v])=>o.position[k]=v);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o;};
+  const mat=(c,mt,rg,si,em,op)=>{const o={color:c,metalness:mt||.3,roughness:rg||.7};if(si)o.side=si;if(em)o.emissive=em;if(op!=null){o.transparent=true;o.opacity=op;}return new THREE.MeshStandardMaterial(o);};
+  const B=(pts,c,op)=>scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:c,transparent:true,opacity:op||.15,blending:THREE.AdditiveBlending,depthWrite:false})));
+
+  function addFloor(R,c1,c2){
+    M(new THREE.CircleGeometry(R*2.5,80),mat(c1.clone().multiplyScalar(.07),.82,.18),{}).rotation.x=-Math.PI/2;
+    const gd=M(new THREE.CircleGeometry(R*.55,48),new THREE.MeshBasicMaterial({color:c2,transparent:true,opacity:.06,depthWrite:false,blending:THREE.AdditiveBlending}));
+    gd.rotation.x=-Math.PI/2;gd.position.y=.01;specials.push({o:gd,t:'fd'});
+  }
+
+  function addArch(t,R,H2,c1,c2,wC){
+    const T3=THREE;
+    if(['cathedral','concert_hall','moorish'].includes(t)){
+      M(new T3.CylinderGeometry(R,R,H2,56,3,true),mat(wC,.12,.85,T3.BackSide));
+      const d=M(new T3.SphereGeometry(R*.96,56,28,0,Math.PI*2,0,Math.PI*.54),mat(wC.clone().lerp(c1,.16),.18,.7,T3.BackSide,c1.clone().multiplyScalar(.04)));d.position.y=H2*.36;
+      for(let i=0;i<14;i++){const a=(i/14)*Math.PI*2,pts=[];for(let tt=0;tt<=20;tt++){const t2=tt/20;pts.push(new T3.Vector3(Math.cos(a)*R*(1-t2*.16),t2*H2*.9,Math.sin(a)*R*(1-t2*.16)));}B(pts,c1.clone().multiplyScalar(.28),.14);}
+      const ap=M(new T3.CircleGeometry(R*.18,32),new T3.MeshBasicMaterial({color:c2,transparent:true,opacity:.18,side:T3.DoubleSide,depthWrite:false}));ap.rotation.x=-Math.PI/2;ap.position.y=H2*.96;specials.push({o:ap,t:'apex'});
+    }else if(['vault','catacombs'].includes(t)){
+      M(new T3.CylinderGeometry(R,R*.9,H2,36,4,true),mat(wC,.65,.34,T3.BackSide,c1.clone().multiplyScalar(.025)));
+      const c3=M(new T3.CircleGeometry(R,36),mat(wC.clone().multiplyScalar(.65),.15,.85,T3.BackSide,c1.clone().multiplyScalar(.04)));c3.rotation.x=Math.PI/2;c3.position.y=H2;
+    }else if(t==='glass_tower'){
+      M(new T3.CylinderGeometry(R,R,H2*2.2,56,1,true),mat(wC,.9,.04,T3.BackSide,null,.82));
+    }else if(['mega','arena'].includes(t)){
+      M(new T3.CylinderGeometry(R,R*1.06,H2,72,2,true),mat(wC,.55,.45,T3.BackSide,c1.clone().multiplyScalar(.03)));
+      const ceil=M(new T3.CircleGeometry(R*.98,72),mat(wC.clone().multiplyScalar(.5),.72,.28,T3.BackSide,c1.clone().multiplyScalar(.08)));ceil.rotation.x=Math.PI/2;ceil.position.y=H2;
+      for(let i=0;i<5;i++){const tr=M(new T3.TorusGeometry(R*(.22+i*.15),.04,6,80),mat(c2.clone().multiplyScalar(.42),.92,.08,null,c1.clone().multiplyScalar(.04)));tr.position.y=H2*.97;tr.rotation.x=Math.PI/2;specials.push({o:tr,t:'truss',i});}
+    }else if(t==='mirror_box'){
+      for(let d=1;d<=7;d++){const bm=M(new T3.BoxGeometry(R*.83*(d/7)*2,H2*.87*(d/7),R*.83*(d/7)*2),new T3.MeshBasicMaterial({color:c1.clone().lerp(c2,.55),wireframe:true,transparent:true,opacity:Math.max(.01,.1-d*.013),depthWrite:false}));bm.position.y=H2*.42;bm.userData.spin=.024-d*.003;specials.push({o:bm,t:'mirror'});}
+      M(new T3.CylinderGeometry(R,R,H2,56,1,true),mat(wC,.9,.04,T3.BackSide,null,.82));
+    }else{
+      M(new T3.CylinderGeometry(R,R,H2,56,2,true),mat(wC,.28,.72,T3.BackSide,c1.clone().multiplyScalar(.03)));
+      const c4=M(new T3.CircleGeometry(R,56),mat(wC.clone().multiplyScalar(.62),.15,.85,T3.BackSide,c1.clone().multiplyScalar(.05)));c4.rotation.x=Math.PI/2;c4.position.y=H2;
+    }
+  }
+
+  function addCols(count,radius,H2,c1,c2){
+    for(let i=0;i<count;i++){
+      const a=(i/count)*Math.PI*2,x=Math.cos(a)*radius,z=Math.sin(a)*radius,ch=H2*.88;
+      M(new THREE.CylinderGeometry(.35,.43,ch,12),mat(c1.clone().multiplyScalar(.36),.42,.56,null,c1.clone().multiplyScalar(.02))).position.set(x,ch/2,z);
+      M(new THREE.CylinderGeometry(.68,.38,.5,12),mat(c2.clone().multiplyScalar(.46),.56,.4)).position.set(x,ch-.14,z);
+      M(new THREE.CylinderGeometry(.54,.54,.25,12),mat(c2.clone().multiplyScalar(.42),.56,.4)).position.set(x,.12,z);
+      const cl=new THREE.PointLight(c1,.0,5.5);cl.position.set(x,ch*.55,z);cl.userData={b:0,ph:Math.random()*Math.PI*2,sp:.38+Math.random()*.5};scene.add(cl);lights.push(cl);
+    }
+  }
+
+  function addStage(R,H2,c1,c2){
+    M(new THREE.CylinderGeometry(2.9,3.3,.22,16),mat(c2.clone().multiplyScalar(.22),.88,.1,null,c1.clone().multiplyScalar(.06)),{y:.11});
+    M(new THREE.CylinderGeometry(3.9,4.1,.14,16),mat(c2.clone().multiplyScalar(.18),.88,.1,null,c1.clone().multiplyScalar(.04)),{y:.07});
+    M(new THREE.BoxGeometry(2,.7,.6),mat(c1.clone().multiplyScalar(.16),.78,.2,null,c1.clone().multiplyScalar(.08))).position.set(0,.46,.42);
+    const led=M(new THREE.BoxGeometry(1.86,.034,.05),new THREE.MeshBasicMaterial({color:c2,transparent:true,opacity:.92}));led.position.set(0,.39,.7);specials.push({o:led,t:'led'});
+    M(new THREE.CylinderGeometry(.16,.20,.76,8),new THREE.MeshStandardMaterial({color:0x080808,roughness:.95})).position.set(0,1.02,0);
+    M(new THREE.SphereGeometry(.18,8,6),new THREE.MeshStandardMaterial({color:0x080808,roughness:.95})).position.set(0,1.57,0);
+    M(new THREE.TorusGeometry(.20,.036,5,16,Math.PI),mat(c2.clone().multiplyScalar(.5),.82,.18)).position.set(0,1.63,0);scene.children[scene.children.length-1].rotation.z=Math.PI/2;
+    const sp=new THREE.SpotLight(c2,.0,R*2.2,Math.PI/4,.38);sp.position.set(0,H2*.82,0);sp.target.position.set(0,0,0);sp.userData={b:0,ph:2.1,sp:.7};scene.add(sp);scene.add(sp.target);lights.push(sp);
+  }
+
+  function addLights(R,H2,c1,c2){
+    scene.add(new THREE.AmbientLight(c1.clone().multiplyScalar(.42),.55));
+    const k=new THREE.PointLight(c1,.0,R*4.5);k.position.set(0,H2*.82,0);k.castShadow=true;k.userData={b:0,ph:0,sp:.72};scene.add(k);lights.push(k);
+    [[-R*.38,H2*.52,R*.32],[R*.38,H2*.52,-R*.32],[-R*.28,H2*.32,-R*.38],[R*.28,H2*.32,R*.38]].forEach((p,i)=>{
+      const fl=new THREE.PointLight(c2.clone().multiplyScalar(.8),.0,R*3.8);fl.position.set(...p);fl.userData={b:0,ph:Math.random()*Math.PI*2,sp:.42+Math.random()*.68};scene.add(fl);lights.push(fl);
+    });
+  }
+
+  function addBeams(R,H2,c1,c2){
+    for(let i=0;i<8;i++){
+      const a=(i/8)*Math.PI*2;
+      const pts=[new THREE.Vector3(Math.cos(a)*R*.09,H2*.86,Math.sin(a)*R*.09),new THREE.Vector3(Math.cos(a+.38)*R*.82,.28,Math.sin(a+.38)*R*.82)];
+      const bl=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:c1.clone().lerp(c2,.38),transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false}));
+      bl.userData={ph:Math.random()*Math.PI*2,sp:.36+Math.random()*.6,bo:.14};scene.add(bl);specials.push({o:bl,t:'beam'});
+    }
+  }
+
+  function addParticles(R,H2,c1,c2){
+    const cnt=2200,g=new THREE.BufferGeometry();
+    const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3),vel=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){
+      const th=Math.random()*Math.PI*2,r2=Math.random()*R*.88,y2=Math.random()*H2*.9;
+      pos[i*3]=Math.cos(th)*r2;pos[i*3+1]=y2;pos[i*3+2]=Math.sin(th)*r2;
+      const mx=Math.random();col[i*3]=c1.r+(c2.r-c1.r)*mx;col[i*3+1]=c1.g+(c2.g-c1.g)*mx;col[i*3+2]=c1.b+(c2.b-c1.b)*mx;
+      vel[i*3]=(Math.random()-.5)*.0011;vel[i*3+1]=Math.random()*.0018+.0005;vel[i*3+2]=(Math.random()-.5)*.0011;
+    }
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    const pts=new THREE.Points(g,new THREE.PointsMaterial({size:.078,vertexColors:true,transparent:true,opacity:.6,sizeAttenuation:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    pts.userData={vel,R,H2};scene.add(pts);particles.push(pts);
+  }
+
+  function addCrowd(R,c1){
+    const cnt=400,g=new THREE.BufferGeometry(),pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){const a=Math.random()*Math.PI*2,r2=R*.65+Math.random()*R*.26;pos[i*3]=Math.cos(a)*r2;pos[i*3+1]=.05;pos[i*3+2]=Math.sin(a)*r2;const b=.28+Math.random()*.28;col[i*3]=c1.r*b;col[i*3+1]=c1.g*b;col[i*3+2]=c1.b*b;}
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    crowd_pts=new THREE.Points(g,new THREE.PointsMaterial({size:.13,vertexColors:true,transparent:true,opacity:.68,sizeAttenuation:true}));
+    scene.add(crowd_pts);
+  }
+
+  function addStars(R,H2,c2){
+    const cnt=2800,sg=new THREE.BufferGeometry(),sp=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){const th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI,r2=R*5+Math.random()*R*12;sp[i*3]=r2*Math.sin(ph)*Math.cos(th);sp[i*3+1]=r2*Math.cos(ph)+H2*2.5;sp[i*3+2]=r2*Math.sin(ph)*Math.sin(th);}
+    sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+    const s=new THREE.Points(sg,new THREE.PointsMaterial({color:c2.clone().lerp(new THREE.Color(1,1,1),.5),size:.16,transparent:true,opacity:.76,sizeAttenuation:true,depthWrite:false}));
+    s.userData.t='stars';scene.add(s);specials.push({o:s,t:'stars'});
+  }
+
+  function addCity(R,c1){
+    const cnt=900,cg=new THREE.BufferGeometry(),cp=new Float32Array(cnt*3),cc=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){cp[i*3]=(Math.random()-.5)*R*20;cp[i*3+1]=-R*.9;cp[i*3+2]=(Math.random()-.5)*R*20;const w=Math.random()>.5;cc[i*3]=w?.96:.28;cc[i*3+1]=w?.78:.68;cc[i*3+2]=w?.22:.96;}
+    cg.setAttribute('position',new THREE.BufferAttribute(cp,3));cg.setAttribute('color',new THREE.BufferAttribute(cc,3));
+    const cl=new THREE.Points(cg,new THREE.PointsMaterial({size:.22,vertexColors:true,transparent:true,opacity:.55,sizeAttenuation:true,depthWrite:false}));
+    cl.userData.t='city';scene.add(cl);specials.push({o:cl,t:'city'});
+  }
+
+  /* All 100 configs */
+  const CONFIGS=(()=>{
+    const base=[
+      ['crystal_cathedral',[.72,.44,1.0],[1.0,.88,.55],0x060010,0x14063a,'cathedral',30,28,12,true,false],
+      ['temple_osiris',[1.0,.67,.10],[1.0,.92,.5],0x0e0700,0x261100,'cathedral',26,24,8,false,false],
+      ['celestial_spire',[.18,.72,1.0],[.70,.95,1.0],0x000816,0x061428,'glass_tower',24,50,0,true,true],
+      ['obsidian_vault',[.50,.20,1.0],[.85,.55,1.0],0x040010,0x0e0028,'vault',22,18,0,false,false],
+      ['amber_palace',[1.0,.60,.08],[1.0,.88,.45],0x0e0700,0x261000,'moorish',25,22,6,false,false],
+      ['nova_sanctum',[.10,.80,.72],[.45,1.0,.92],0x00090e,0x04201c,'mega',55,42,9,false,false],
+      ['absinthe_garden',[.18,.80,.28],[.55,1.0,.62],0x020e04,0x082a0e,'cathedral',23,20,0,true,false],
+      ['black_mirror',[.30,.60,1.0],[.72,.88,1.0],0x020408,0x0a1830,'mirror_box',24,22,0,false,true],
+      ['ivory_temple',[.95,.78,.28],[1.0,.95,.62],0x0e0c04,0x261e06,'concert_hall',34,30,8,false,false],
+    ];
+    // Build rest from REGISTRY
+    const rest=REGISTRY.slice(9).map(r=>{
+      const [rv,gv,bv]=r.rgb.split(',').map(Number);
+      return [r.id,[rv/255,gv/255,bv/255],[(rv/255)*1.35,(gv/255)*1.35,(bv/255)*1.35],
+        parseInt(`0x${Math.round(rv*.06).toString(16).padStart(2,'0')}${Math.round(gv*.06).toString(16).padStart(2,'0')}${Math.round(bv*.06).toString(16).padStart(2,'0')}`)||0x020204,
+        parseInt(`0x${Math.round(rv*.18).toString(16).padStart(2,'0')}${Math.round(gv*.18).toString(16).padStart(2,'0')}${Math.round(bv*.18).toString(16).padStart(2,'0')}`)||0x060608,
+        'cathedral',28,22,Math.floor(Math.random()*5+3),true,false];
+    });
+    return [...base,...rest].map(([id,c1,c2,bg,fog,arch,R,H,cols,stars,city])=>({
+      id,pal:{c1:c1.map(v=>Math.min(v,1)),c2:c2.map(v=>Math.min(v,1)),bg,fog,fd:.016},
+      arch:{t:arch,R,H,cols},stars,city
+    }));
+  })();
+
+  function getCfg(id){return CONFIGS.find(c=>c.id===id)||CONFIGS[0];}
+
+  /* ── ANIMATE ── */
+  function tick(){
+    if(!running)return;
+    raf=requestAnimationFrame(tick);
+    const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+    Demo.tick(dt,t);
+    lights.forEach(l=>{
+      if(!l.userData.b)l.userData.b=l.isSpotLight?2.2:2.5;
+      const p=Math.sin(t*l.userData.sp+l.userData.ph);
+      l.intensity=l.userData.b*(l.isSpotLight?(.62+.38*Math.abs(p)):(.7+.3*p));
+    });
+    specials.forEach(s=>{
+      const o=s.o,tp=s.t;
+      if(tp==='beam'){o.material.opacity=o.userData.bo*(.3+.7*Math.abs(Math.sin(t*o.userData.sp+o.userData.ph)));}
+      else if(tp==='stars'){o.rotation.y+=dt*.0006;}
+      else if(tp==='city'){o.material.opacity=.4+.18*Math.sin(t*.72);}
+      else if(tp==='apex'){o.material.opacity=.14+.1*Math.sin(t*.55);}
+      else if(tp==='fd'){o.material.opacity=.04+.04*Math.sin(t*.46);}
+      else if(tp==='led'){o.material.opacity=.6+.4*Math.abs(Math.sin(t*2.8));}
+      else if(tp==='mirror'){o.rotation.y+=dt*(o.userData.spin||.04);}
+      else if(tp==='truss'){o.rotation.z+=dt*(.038+s.i*.008);}
+    });
+    particles.forEach(pts=>{
+      const pos=pts.geometry.attributes.position.array,vel=pts.userData.vel,R=pts.userData.R||28,H2=pts.userData.H2||22;
+      for(let i=0;i<pos.length/3;i++){
+        pos[i*3]+=vel[i*3]*60*dt;pos[i*3+1]+=vel[i*3+1]*60*dt;pos[i*3+2]+=vel[i*3+2]*60*dt;
+        if(pos[i*3+1]>H2*.94)pos[i*3+1]=.04;
+        if(Math.sqrt(pos[i*3]*pos[i*3]+pos[i*3+2]*pos[i*3+2])>R*.86){pos[i*3]*=.5;pos[i*3+2]*=.5;}
+      }
+      pts.geometry.attributes.position.needsUpdate=true;
+    });
+    if(crowd_pts){
+      const pos=crowd_pts.geometry.attributes.position.array;
+      for(let i=0;i<pos.length/3;i++){pos[i*3+1]=.05+Math.abs(Math.sin(t*2.1+i*.14))*.07;}
+      crowd_pts.geometry.attributes.position.needsUpdate=true;
+    }
+    renderer.setRenderTarget(bloomRT);renderer.render(scene,camera);
+    renderBloom();
+  }
+
+  /* ── PROGRESS ── */
+  function prog(p,s){document.getElementById('udj-ld-prog').style.width=p+'%';document.getElementById('udj-ld-status').textContent=s;}
+
+  /* ── LOAD ── */
+  let currentIdx=0;
+  function loadClub(idx){
+    const club=REGISTRY[idx]||REGISTRY[0];
+    const cfg=getCfg(club.id);
+    currentIdx=idx;
+    document.getElementById('udj-ld-name').textContent=club.name;
+    document.getElementById('udj-ld-loc').textContent='📍 '+club.loc;
+    document.getElementById('udj-loading').classList.remove('out');
+    document.getElementById('udj-enter-prompt').classList.add('out');
+    prog(0,'Building environment…');
+    setTimeout(()=>{
+      prog(28,'Constructing architecture…');
+      buildScene(cfg);
+      prog(60,'Installing lighting…');
+      Demo.updateHUD(club,idx);
+      document.getElementById('udj-club-name').textContent=club.name;
+      document.getElementById('udj-club-meta').textContent='📍 '+club.loc+' · '+club.tier;
+      look.pitch=0;look.yaw=0;applyLook();
+      camera.position.set(0,1.72,0);
+      clock.start();
+      setTimeout(()=>{
+        prog(88,'Calibrating bloom…');
+        setTimeout(()=>{
+          prog(100,'Ready.');
+          setTimeout(()=>{
+            document.getElementById('udj-loading').classList.add('out');
+            document.getElementById('udj-transition').classList.remove('in');
+            Demo.transitioning=false;
+            if(!running){running=true;tick();}
+            if(Demo.isDemo){document.getElementById('udj-enter-prompt').classList.add('out');}
+            else{const ep=document.getElementById('udj-enter-prompt');ep.classList.remove('out');ep.onclick=()=>{ep.classList.add('out');};}
+          },320);
+        },180);
+      },65);
+    },88);
+  }
+
+  /* ── PUBLIC ENTER ── */
+  function enter(clubId,fallbackIdx=0){
+    const idx=REGISTRY.findIndex(c=>c.id===clubId);
+    const realIdx=idx>=0?idx:fallbackIdx;
+
+    window.onThreeReady(()=>{
+      // Hide game screens
+      document.querySelectorAll('.game-screen').forEach(s=>s.classList.remove('active'));
+      const overlay=document.getElementById('udj-3d-overlay');
+      overlay.classList.add('active');
+      document.getElementById('udj-demo').style.display=Demo.isDemo?'block':'none';
+      document.getElementById('udj-hud').style.opacity=Demo.isDemo?'0':'1';
+
+      if(!renderer)initGL();
+      document.getElementById('udj-transition').classList.add('in');
+      setTimeout(()=>loadClub(realIdx),600);
+    });
+  }
+
+  function exit(){
+    running=false;if(raf)cancelAnimationFrame(raf);
+    document.getElementById('udj-3d-overlay').classList.remove('active');
+    document.getElementById('udj-transition').classList.remove('in');
+    document.getElementById('udj-loading').classList.remove('out');
+    document.getElementById('udj-ld-prog').style.width='0%';
+    document.getElementById('udj-enter-prompt').classList.add('out');
+    // Restore main game
+    document.getElementById('clubScreen').classList.add('active');
+  }
+
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(Demo.isDemo)Demo.pause();else exit();}});
+  document.addEventListener('click',()=>{if(Demo&&Demo.isDemo&&document.getElementById('udj-3d-overlay').classList.contains('active'))Demo.pause();},{capture:true,once:false});
+
+  /* ── SONY DEMO ── */
+  const Demo={
+    isDemo:false,idx:0,elapsed:0,dur:16,autoYaw:0,transitioning:false,
+    updateHUD(club,idx){
+      document.getElementById('demo-num').textContent=`Club ${String(idx+1).padStart(2,'0')} of ${REGISTRY.length}`;
+      document.getElementById('demo-name').textContent=club.name;
+      document.getElementById('demo-loc').textContent=club.loc;
+      document.getElementById('demo-tier').textContent=club.tier;
+      document.getElementById('demo-cap').textContent=(club.cap>=1000?(club.cap/1000).toFixed(0)+'K':club.cap)||'—';
+      document.getElementById('demo-rev').textContent=club.rev>0?'$'+(club.rev/1000).toFixed(0)+'K':'Free';
+    },
+    tick(dt,t){
+      if(!this.isDemo)return;
+      this.elapsed+=dt;this.autoYaw+=dt*.055;
+      camera.rotation.set(-.1+Math.sin(this.elapsed*.1)*.05,this.autoYaw,0,'YXZ');
+      document.getElementById('udj-demo-prog-fill').style.width=Math.min(this.elapsed/this.dur*100,100)+'%';
+      if(this.elapsed>=this.dur&&!this.transitioning)this.advance();
+    },
+    advance(){
+      this.transitioning=true;this.elapsed=0;
+      document.getElementById('udj-transition').classList.add('in');
+      setTimeout(()=>{this.idx=(this.idx+1)%REGISTRY.length;loadClub(this.idx);},600);
+    },
+    next(){this.elapsed=0;this.advance();},
+    pause(){
+      this.isDemo=false;
+      document.getElementById('udj-demo').style.display='none';
+      document.getElementById('udj-hud').style.opacity='1';
+    },
+    resume(){
+      this.isDemo=true;
+      look.pitch=0;look.yaw=this.autoYaw;
+      document.getElementById('udj-demo').style.display='block';
+      document.getElementById('udj-hud').style.opacity='0';
+    },
+    startFromClub(idx){
+      this.isDemo=true;this.idx=idx;this.elapsed=0;
+      document.getElementById('udj-demo').style.display='block';
+      document.getElementById('udj-hud').style.opacity='0';
+    }
+  };
+
+  /* ── VR ── */
+  const VR={
+    async enter(){
+      if(!navigator.xr){toast('WebXR not supported.');return;}
+      try{
+        if(!await navigator.xr.isSessionSupported('immersive-vr')){toast('No VR headset detected.');return;}
+        const sess=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']});
+        if(renderer)renderer.xr?.setSession(sess);
+        document.getElementById('udj-vr-btn').textContent='⊠ EXIT VR';
+        sess.addEventListener('end',()=>{document.getElementById('udj-vr-btn').textContent='⊞ VR';});
+      }catch(e){toast('VR error: '+e.message);}
+    }
+  };
+
+  return{enter,exit,Demo,VR,
+    // Sony pitch demo — call this to start the auto-touring demo
+    startDemo(startIdx=0){
+      enter(REGISTRY[startIdx].id,startIdx);
+      window.onThreeReady(()=>setTimeout(()=>Demo.startFromClub(startIdx),2000));
+    }
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded',()=>{
+  Game.render('all');
+  // Uncomment to auto-start Sony demo mode on load:
+  // setTimeout(()=>UDJ3D.startDemo(0), 800);
+});
+</script>
+</body>
+</html>
